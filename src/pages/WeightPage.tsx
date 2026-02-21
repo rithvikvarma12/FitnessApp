@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Unit } from "../services/units";
-import { formatWeight, fromDisplay } from "../services/units";
-import { toDisplay } from "../services/units";
+import { formatWeight, fromDisplay, toDisplay } from "../services/units";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/db";
 import type { WeightEntry } from "../db/types";
@@ -22,9 +21,18 @@ ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip,
 
 type Range = "7" | "30" | "90" | "all";
 
+function normalizeDateISO(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value.slice(0, 10);
+
+  return format(parsed, "yyyy-MM-dd");
+}
+
 export default function WeightPage() {
   const entries = useLiveQuery(
-    async () => db.weightEntries.orderBy("dateISO").toArray(),
+    async () => db.weightEntries.toArray(),
     [],
     [] as WeightEntry[]
   );
@@ -34,27 +42,75 @@ export default function WeightPage() {
     return (s?.value as Unit) ?? "kg";
   }, [], "kg" as Unit);
 
+  const goalWeightKg = useLiveQuery(async () => {
+    const s = await db.settings.get("goalWeightKg");
+    const n = Number(s?.value);
+    return Number.isFinite(n) ? n : null;
+  }, [], null as number | null);
+
   const [newWeight, setNewWeight] = useState("");
+  const [goalWeightInput, setGoalWeightInput] = useState("");
   const [range, setRange] = useState<Range>("30");
 
-  const filtered = useMemo(() => {
-    if (!entries) return [];
-    if (range === "all") return entries;
-    const n = Number(range);
-    return entries.slice(Math.max(0, entries.length - n));
-  }, [entries, range]);
+  useEffect(() => {
+    if (goalWeightKg === null) {
+      setGoalWeightInput("");
+      return;
+    }
 
-  const labels = filtered.map(e => e.dateISO);
-  const weights = filtered.map(e =>
-  unit ? toDisplay(e.weightKg, unit) : e.weightKg
-  );
+    setGoalWeightInput(toDisplay(goalWeightKg, unit).toFixed(1));
+  }, [goalWeightKg, unit]);
+
+  const sortedEntries = useMemo(() => {
+    return [...(entries ?? [])]
+      .map((entry) => ({ ...entry, dateISO: normalizeDateISO(entry.dateISO) }))
+      .sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  }, [entries]);
+
+  const filtered = useMemo(() => {
+    if (range === "all") return sortedEntries;
+    const n = Number(range);
+    return sortedEntries.slice(Math.max(0, sortedEntries.length - n));
+  }, [sortedEntries, range]);
+
+  const labels = filtered.map((e) => e.dateISO);
+  const weights = filtered.map((e) => toDisplay(e.weightKg, unit));
   const trend = movingAverage(weights, 7);
+  const goalLine = goalWeightKg === null
+    ? []
+    : filtered.map(() => toDisplay(goalWeightKg, unit));
 
   const data = {
     labels,
     datasets: [
-      { label: "Weight (kg)", data: weights, tension: 0.25 },
-      { label: "Trend (7d avg)", data: trend, tension: 0.25 }
+      {
+        label: `Weight (${unit})`,
+        data: weights,
+        tension: 0.25,
+        borderColor: "#38bdf8",
+        backgroundColor: "#38bdf8"
+      },
+      {
+        label: "Trend (7d avg)",
+        data: trend,
+        tension: 0.25,
+        borderColor: "#22c55e",
+        backgroundColor: "#22c55e"
+      },
+      ...(goalWeightKg === null
+        ? []
+        : [
+            {
+              label: "Goal",
+              data: goalLine,
+              tension: 0,
+              borderColor: "#f59e0b",
+              backgroundColor: "#f59e0b",
+              borderDash: [6, 6],
+              pointRadius: 0,
+              pointHoverRadius: 0
+            }
+          ])
     ]
   };
 
@@ -63,8 +119,53 @@ export default function WeightPage() {
     plugins: { legend: { labels: { color: "#e5e7eb" } } },
     scales: {
       x: { ticks: { color: "#e5e7eb" }, grid: { color: "#1f2937" } },
-      y: { ticks: { color: "#e5e7eb" }, grid: { color: "#1f2937" } }
+      y: {
+        ticks: { color: "#e5e7eb" },
+        grid: { color: "#1f2937" },
+        title: { display: true, text: `Weight (${unit})`, color: "#e5e7eb" }
+      }
     }
+  };
+
+  const handleAddWeight = async () => {
+    const trimmed = newWeight.trim();
+    if (!trimmed) return;
+
+    const raw = Number(trimmed);
+    if (!Number.isFinite(raw)) return;
+
+    const wKg = fromDisplay(raw, unit);
+    const todayISO = format(new Date(), "yyyy-MM-dd");
+    const createdAtISO = new Date().toISOString();
+
+    const existing = await db.weightEntries.where("dateISO").equals(todayISO).first();
+    if (existing) {
+      await db.weightEntries.update(existing.id, { weightKg: wKg, createdAtISO, dateISO: todayISO });
+    } else {
+      await db.weightEntries.add({
+        id: crypto.randomUUID(),
+        dateISO: todayISO,
+        weightKg: wKg,
+        createdAtISO
+      });
+    }
+
+    setNewWeight("");
+  };
+
+  const handleSaveGoal = async () => {
+    const trimmed = goalWeightInput.trim();
+
+    if (!trimmed) {
+      await db.settings.delete("goalWeightKg");
+      return;
+    }
+
+    const raw = Number(trimmed);
+    if (!Number.isFinite(raw)) return;
+
+    const goalKg = fromDisplay(raw, unit);
+    await db.settings.put({ key: "goalWeightKg", value: String(goalKg) });
   };
 
   return (
@@ -89,11 +190,11 @@ export default function WeightPage() {
         >
           lb
         </button>
-    </div>
+      </div>
 
       <div className="row" style={{ alignItems: "end" }}>
-        <div className="col">
-          <div className="small muted">Weight (kg)</div>
+        <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+          <div className="small muted">Weight ({unit})</div>
           <input
             inputMode="decimal"
             placeholder="e.g., 86.3"
@@ -102,7 +203,33 @@ export default function WeightPage() {
           />
         </div>
 
-        <div style={{ width: 170 }}>
+        <div style={{ flex: "0 0 120px", minWidth: 120 }}>
+          <button onClick={handleAddWeight} style={{ width: "100%" }}>
+            Add
+          </button>
+        </div>
+
+        <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+          <div className="small muted">Goal ({unit})</div>
+          <input
+            inputMode="decimal"
+            placeholder="Set goal"
+            value={goalWeightInput}
+            onChange={(e) => setGoalWeightInput(e.target.value)}
+          />
+        </div>
+
+        <div style={{ flex: "0 0 120px", minWidth: 120 }}>
+          <button className="secondary" onClick={handleSaveGoal} style={{ width: "100%" }}>
+            Save goal
+          </button>
+        </div>
+      </div>
+
+      <hr />
+
+      <div className="row" style={{ alignItems: "end", marginBottom: 10 }}>
+        <div style={{ width: 180, maxWidth: "100%" }}>
           <div className="small muted">Range</div>
           <select value={range} onChange={(e) => setRange(e.target.value as Range)}>
             <option value="7">Last 7</option>
@@ -111,40 +238,7 @@ export default function WeightPage() {
             <option value="all">All</option>
           </select>
         </div>
-
-        <div style={{ width: 140 }}>
-          <button
-            onClick={async () => {
-              const raw = Number(newWeight);
-              if (!Number.isFinite(raw)) return;
-
-              const wKg = unit ? fromDisplay(raw, unit) : raw;
-
-              const todayISO = format(new Date(), "yyyy-MM-dd");
-              const createdAtISO = new Date().toISOString();
-
-              // Upsert: one entry per day
-              const existing = await db.weightEntries.where("dateISO").equals(todayISO).first();
-              if (existing) {
-                await db.weightEntries.update(existing.id, { weightKg: wKg, createdAtISO });
-              } else {
-                await db.weightEntries.add({
-                  id: crypto.randomUUID(),
-                  dateISO: todayISO,
-                  weightKg: wKg,
-                  createdAtISO
-                });
-              }
-
-              setNewWeight("");
-            }}
-          >
-            Add
-          </button>
-        </div>
       </div>
-
-      <hr />
 
       <div className="card" style={{ background: "#0b1220" }}>
         {filtered.length >= 2 ? (
@@ -157,11 +251,11 @@ export default function WeightPage() {
       <hr />
 
       <div className="list">
-        {(entries ?? []).slice().reverse().map(e => (
+        {sortedEntries.slice().reverse().map((e) => (
           <div key={e.id} className="row" style={{ alignItems: "center" }}>
             <div className="pill">{e.dateISO}</div>
             <div style={{ fontWeight: 700 }}>
-              {unit ? formatWeight(e.weightKg, unit) : e.weightKg.toFixed(1)} {unit}
+              {formatWeight(e.weightKg, unit)} {unit}
             </div>
             <button
               className="secondary"
