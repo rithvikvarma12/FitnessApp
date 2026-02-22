@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { db } from "../db/db";
 import type { Unit } from "../services/units";
@@ -174,6 +174,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
       {daysSorted.map((day) => (
         <DayCard
           key={day.id}
+          defaultExpanded={day.id === daysSorted[0]?.id}
           day={day}
           unit={unit}
           isLocked={week.isLocked}
@@ -190,6 +191,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
 }
 
 function DayCard({
+  defaultExpanded,
   day,
   unit,
   isLocked,
@@ -200,6 +202,7 @@ function DayCard({
   onRampPlanFromBase,
   onSetPlanToLastActual
 }: {
+  defaultExpanded: boolean;
   day: WorkoutDay;
   unit: Unit;
   isLocked: boolean;
@@ -211,11 +214,22 @@ function DayCard({
   onSetPlanToLastActual: (dayId: string, exId: string) => void;
 }) {
   const dateLabel = format(parseISO(day.dateISO), "EEE, MMM d");
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
     <div className="card">
-      <div className="row" style={{ alignItems: "center" }}>
-        <div className="col">
+      <div className="dayCardHeader">
+        <button
+          type="button"
+          className="dayToggle"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse day" : "Expand day"}
+        >
+          <span className="dayToggleChevron" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+        </button>
+
+        <div className="dayHeaderMain">
           <h3>{day.title}</h3>
           <div className="small muted">{dateLabel}</div>
         </div>
@@ -232,24 +246,27 @@ function DayCard({
         </label>
       </div>
 
-      <hr />
-
-      <div className="list">
-        {day.exercises.map((ex) => (
-          <ExerciseCard
-            key={ex.id}
-            dayId={day.id}
-            ex={ex}
-            unit={unit}
-            isLocked={isLocked}
-            onSetUpdate={onSetUpdate}
-            onExerciseBasePlanUpdate={onExerciseBasePlanUpdate}
-            onApplyBaseToAllSets={onApplyBaseToAllSets}
-            onRampPlanFromBase={onRampPlanFromBase}
-            onSetPlanToLastActual={onSetPlanToLastActual}
-          />
-        ))}
-      </div>
+      {expanded && (
+        <>
+          <hr />
+          <div className="list">
+            {day.exercises.map((ex) => (
+              <ExerciseCard
+                key={ex.id}
+                dayId={day.id}
+                ex={ex}
+                unit={unit}
+                isLocked={isLocked}
+                onSetUpdate={onSetUpdate}
+                onExerciseBasePlanUpdate={onExerciseBasePlanUpdate}
+                onApplyBaseToAllSets={onApplyBaseToAllSets}
+                onRampPlanFromBase={onRampPlanFromBase}
+                onSetPlanToLastActual={onSetPlanToLastActual}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -276,17 +293,16 @@ function ExerciseCard({
   onSetPlanToLastActual: (dayId: string, exId: string) => void;
 }) {
   const lastActualWeightKg = lastNonEmptyActualWeightKg(ex);
-  const gridCols = "56px 110px 1fr 1fr 1fr 60px";
 
   return (
-    <div className="card" style={{ background: "#0b1220" }}>
-      <div className="row" style={{ alignItems: "center" }}>
+    <div className="card workoutExerciseCard" style={{ background: "#0b1220" }}>
+      <div className="row exerciseHeaderRow" style={{ alignItems: "center" }}>
         <div className="col">
           <div style={{ fontWeight: 700 }}>{ex.name}</div>
           <div className="small muted">
             {ex.plannedSets} sets • reps {ex.repRange.min}-{ex.repRange.max}
           </div>
-          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+          <div className="row exerciseActionRow" style={{ gap: 8, marginTop: 8 }}>
             <button
               className="secondary"
               disabled={isLocked || typeof ex.plannedWeightKg !== "number"}
@@ -314,7 +330,7 @@ function ExerciseCard({
           </div>
         </div>
 
-        <div style={{ width: 160 }}>
+        <div className="exerciseBaseField">
           <input
             disabled={isLocked}
             inputMode="decimal"
@@ -337,7 +353,7 @@ function ExerciseCard({
 
       <hr />
 
-      <div className="setRow small muted" style={{ marginBottom: 6, gridTemplateColumns: gridCols }}>
+      <div className="setRow setRowPlan setHeaderRow small muted" style={{ marginBottom: 6 }}>
         <div>Set</div>
         <div>Planned reps</div>
         <div>Planned weight</div>
@@ -348,68 +364,86 @@ function ExerciseCard({
 
       <div className="list" style={{ gap: 8 }}>
         {ex.sets.map((s) => (
-          <div key={s.setNumber} className="setRow" style={{ gridTemplateColumns: gridCols }}>
-            <div className="pill" style={{ justifyContent: "center" }}>{s.setNumber}</div>
-
-            <div className="pill" style={{ justifyContent: "center" }}>
-              {s.plannedRepsMin}-{s.plannedRepsMax}
+          <div key={s.setNumber} className="setRow setRowPlan setDataRow">
+            <div className="setField setFieldSet">
+              <div className="setFieldLabel">Set</div>
+              <div className="pill" style={{ justifyContent: "center" }}>{s.setNumber}</div>
             </div>
 
-            <input
-              disabled={isLocked}
-              inputMode="decimal"
-              placeholder={typeof ex.plannedWeightKg === "number" ? String(toDisplay(ex.plannedWeightKg, unit)) : ""}
-              value={typeof s.plannedWeightKg === "number" ? toDisplay(s.plannedWeightKg, unit) : ""}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                const num = v === "" ? undefined : Number(v);
-                const kg =
-                  num === undefined || !Number.isFinite(num)
-                    ? undefined
-                    : fromDisplay(num, unit);
+            <div className="setField">
+              <div className="setFieldLabel">Planned reps</div>
+              <div className="pill" style={{ justifyContent: "center" }}>
+                {s.plannedRepsMin}-{s.plannedRepsMax}
+              </div>
+            </div>
 
-                onSetUpdate(dayId, ex.id, s.setNumber, { plannedWeightKg: kg });
-              }}
-            />
+            <div className="setField">
+              <div className="setFieldLabel">Planned weight</div>
+              <input
+                disabled={isLocked}
+                inputMode="decimal"
+                placeholder={typeof ex.plannedWeightKg === "number" ? String(toDisplay(ex.plannedWeightKg, unit)) : ""}
+                value={typeof s.plannedWeightKg === "number" ? toDisplay(s.plannedWeightKg, unit) : ""}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  const num = v === "" ? undefined : Number(v);
+                  const kg =
+                    num === undefined || !Number.isFinite(num)
+                      ? undefined
+                      : fromDisplay(num, unit);
 
-            <input
-              disabled={isLocked}
-              inputMode="numeric"
-              placeholder={`${s.plannedRepsMin}-${s.plannedRepsMax}`}
-              value={s.actualReps ?? ""}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                const num = v === "" ? undefined : Number(v);
-                onSetUpdate(dayId, ex.id, s.setNumber, {
-                  actualReps: Number.isFinite(num as number) ? (num as number) : undefined
-                });
-              }}
-            />
+                  onSetUpdate(dayId, ex.id, s.setNumber, { plannedWeightKg: kg });
+                }}
+              />
+            </div>
 
-            <input
-              disabled={isLocked}
-              inputMode="decimal"
-              placeholder={s.plannedWeightKg !== undefined ? String(toDisplay(s.plannedWeightKg, unit)) : ""}
-              value={typeof s.actualWeightKg === "number" ? toDisplay(s.actualWeightKg, unit) : ""}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                const num = v === "" ? undefined : Number(v);
-                const kg =
-                  num === undefined || !Number.isFinite(num)
-                    ? undefined
-                    : fromDisplay(num, unit);
+            <div className="setField">
+              <div className="setFieldLabel">Actual reps</div>
+              <input
+                disabled={isLocked}
+                inputMode="numeric"
+                placeholder={`${s.plannedRepsMin}-${s.plannedRepsMax}`}
+                value={s.actualReps ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  const num = v === "" ? undefined : Number(v);
+                  onSetUpdate(dayId, ex.id, s.setNumber, {
+                    actualReps: Number.isFinite(num as number) ? (num as number) : undefined
+                  });
+                }}
+              />
+            </div>
 
-                onSetUpdate(dayId, ex.id, s.setNumber, { actualWeightKg: kg });
-              }}
-            />
+            <div className="setField">
+              <div className="setFieldLabel">Actual weight</div>
+              <input
+                disabled={isLocked}
+                inputMode="decimal"
+                placeholder={s.plannedWeightKg !== undefined ? String(toDisplay(s.plannedWeightKg, unit)) : ""}
+                value={typeof s.actualWeightKg === "number" ? toDisplay(s.actualWeightKg, unit) : ""}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  const num = v === "" ? undefined : Number(v);
+                  const kg =
+                    num === undefined || !Number.isFinite(num)
+                      ? undefined
+                      : fromDisplay(num, unit);
 
-            <input
-              disabled={isLocked}
-              type="checkbox"
-              checked={s.completed}
-              onChange={(e) => onSetUpdate(dayId, ex.id, s.setNumber, { completed: e.target.checked })}
-              style={{ width: 20, height: 20 }}
-            />
+                  onSetUpdate(dayId, ex.id, s.setNumber, { actualWeightKg: kg });
+                }}
+              />
+            </div>
+
+            <div className="setField setFieldDone">
+              <div className="setFieldLabel">Done</div>
+              <input
+                disabled={isLocked}
+                type="checkbox"
+                checked={s.completed}
+                onChange={(e) => onSetUpdate(dayId, ex.id, s.setNumber, { completed: e.target.checked })}
+                style={{ width: 20, height: 20 }}
+              />
+            </div>
           </div>
         ))}
       </div>

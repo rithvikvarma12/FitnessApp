@@ -3,7 +3,36 @@ import type { ExerciseTemplate, PlanTemplate, DayTemplate } from "./types";
 
 const uid = () => crypto.randomUUID();
 
+async function ensureExerciseTemplatesByName(items: Array<Omit<ExerciseTemplate, "id">>) {
+  const existing = await db.exerciseTemplates.toArray();
+  const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
+  const missing: ExerciseTemplate[] = items
+    .filter((item) => !existingNames.has(item.name.toLowerCase()))
+    .map((item) => ({ id: uid(), ...item }));
+
+  if (missing.length > 0) {
+    await db.exerciseTemplates.bulkAdd(missing);
+  }
+}
+
 export async function ensureSeedData() {
+  const homeMinimalPack: Array<Omit<ExerciseTemplate, "id">> = [
+    { name: "Push-Ups", defaultSets: 3, repRange: { min: 10, max: 20 } },
+    { name: "Bodyweight Squat", defaultSets: 3, repRange: { min: 12, max: 20 } },
+    { name: "Walking Lunges", defaultSets: 3, repRange: { min: 10, max: 16 } },
+    { name: "Glute Bridge", defaultSets: 3, repRange: { min: 12, max: 20 } },
+    { name: "Pike Push-Up", defaultSets: 3, repRange: { min: 6, max: 15 } },
+    { name: "Plank", defaultSets: 3, repRange: { min: 20, max: 60 } },
+    { name: "One-Arm Dumbbell Row", defaultSets: 3, repRange: { min: 8, max: 15 } },
+    { name: "Dumbbell Floor Press", defaultSets: 3, repRange: { min: 8, max: 15 } },
+    { name: "Goblet Squat", defaultSets: 3, repRange: { min: 8, max: 15 } },
+    { name: "Romanian Deadlift (Dumbbell)", defaultSets: 3, repRange: { min: 8, max: 15 } },
+    { name: "Dumbbell Shoulder Press", defaultSets: 3, repRange: { min: 8, max: 12 } },
+    { name: "Dumbbell Bicep Curl", defaultSets: 3, repRange: { min: 10, max: 15 } },
+    { name: "Dumbbell Overhead Tricep Extension", defaultSets: 3, repRange: { min: 10, max: 15 } }
+  ];
+  await ensureExerciseTemplatesByName(homeMinimalPack);
+
   const existing = await db.planTemplates.count();
   if (existing > 0) return;
 
@@ -97,6 +126,7 @@ export async function ensureSeedData() {
   };
 
   await db.exerciseTemplates.bulkAdd(ex);
+  await ensureExerciseTemplatesByName(homeMinimalPack);
   await db.planTemplates.add(plan);
   await db.settings.put({ key: "unit", value: "kg" });
 }

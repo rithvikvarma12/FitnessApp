@@ -19,6 +19,11 @@ type GenerationConstraints = {
   avoidGroups: NoteGroup[];
   timeCapMinutes?: number;
 };
+type EquipmentType = "gym" | "home" | "minimal";
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, " ");
+}
 
 function inferNextWeekDays(notes?: string, explicit?: number): number {
   if (explicit && [3, 4, 5].includes(explicit)) return explicit;
@@ -163,14 +168,30 @@ const COMPOUND_KEYWORDS = [
 function classifyMuscleBucket(name: string): MuscleBucket {
   const n = name.toLowerCase();
 
+  if (
+    n.includes("leg") ||
+    n.includes("calf") ||
+    n.includes("squat") ||
+    n.includes("lunge") ||
+    n.includes("glute bridge") ||
+    n.includes("romanian deadlift") ||
+    n.includes("rdl")
+  ) return "legs";
+
   if (MUSCLE_KEYWORDS.triceps.some(k => n.includes(k))) return "triceps";
+  if (n.includes("overhead tricep")) return "triceps";
   if (n.includes("bicep") || MUSCLE_KEYWORDS.biceps.some(k => n.includes(k))) return "biceps";
+  if (n.includes("dumbbell bicep")) return "biceps";
+  if (n.includes("pike push-up") || n.includes("pike push up")) return "shoulders";
+  if (n.includes("dumbbell shoulder press")) return "shoulders";
   if (MUSCLE_KEYWORDS.shoulders.some(k => n.includes(k))) return "shoulders";
+  if (n.includes("push-up") || n.includes("push up")) return "chest";
+  if (n.includes("floor press")) return "chest";
   if (MUSCLE_KEYWORDS.chest.some(k => n.includes(k))) return "chest";
   if (MUSCLE_KEYWORDS.back.some(k => n.includes(k))) return "back";
-  if (n.includes("leg") || n.includes("calf") || n.includes("squat")) return "legs";
   if ((n.includes("extension") || n.includes("curl")) && n.includes("leg")) return "legs";
   if (n.includes("press") && n.includes("leg")) return "legs";
+  if (n.includes("row")) return "back";
 
   return "other";
 }
@@ -195,6 +216,241 @@ function isIsolationExercise(name: string): boolean {
     "hammer"
   ];
   return isolationKeywords.some((k) => n.includes(k));
+}
+
+function isGymOnlyExercise(name: string): boolean {
+  const n = name.toLowerCase();
+  return [
+    "cable",
+    "machine",
+    "leg press",
+    "lat pulldown",
+    "pulldown",
+    "seated cable",
+    "pec fly machine",
+    "leg extension",
+    "leg curl"
+  ].some((k) => n.includes(k));
+}
+
+function isHomeFriendly(name: string): boolean {
+  const n = name.toLowerCase();
+  return [
+    "push-up",
+    "push up",
+    "dumbbell",
+    "bodyweight",
+    "band",
+    "plank",
+    "squat",
+    "lunge",
+    "split squat",
+    "rdl",
+    "romanian deadlift",
+    "glute bridge",
+    "pull-up",
+    "pull up"
+  ].some((k) => n.includes(k));
+}
+
+function requiredGroupsForDayTitle(title: string): MuscleBucket[] {
+  const t = title.toLowerCase();
+  if (t.includes("upper") && t.includes("push")) return ["chest", "shoulders"];
+  if (t.includes("lower + back")) return ["legs", "back"];
+  if (t.includes("upper") && t.includes("pull")) return ["back", "shoulders"];
+  if (t === "lower" || t.includes("lower (")) return ["legs"];
+  return [];
+}
+
+function substitutionNameCandidates(sourceName: string): string[] {
+  const n = sourceName.toLowerCase();
+  if (n.includes("flat bench press")) return ["Dumbbell Floor Press", "Push-Ups"];
+  if (n.includes("cable crossover")) return ["Dumbbell Fly", "Push-Ups"];
+  if (n.includes("lat pulldown") || n.includes("pulldown")) {
+    return ["Band Lat Pulldown", "Pull-Ups", "One-Arm Dumbbell Row"];
+  }
+  if (n.includes("seated cable row")) return ["One-Arm Dumbbell Row"];
+  if (n.includes("leg press")) return ["Goblet Squat", "Bodyweight Squat"];
+  if (n.includes("leg extension")) return ["Split Squat", "Lunge"];
+  if (n.includes("leg curl")) return ["RDL", "Romanian Deadlift", "Glute Bridge"];
+  if (n.includes("machine")) return ["Dumbbell", "Bodyweight", "Band"];
+  if (n.includes("cable")) return ["Dumbbell", "Band", "Push-Ups"];
+  return [];
+}
+
+function findExistingExerciseIdByNames(
+  exTemplates: ExerciseTemplate[],
+  candidateNames: string[],
+  excludedIds: Set<string>
+): string | undefined {
+  if (candidateNames.length === 0) return undefined;
+
+  const lowerCandidates = candidateNames.map((x) => x.toLowerCase());
+  const exact = exTemplates.find((ex) =>
+    !excludedIds.has(ex.id) && lowerCandidates.includes(ex.name.toLowerCase())
+  );
+  if (exact && !isGymOnlyExercise(exact.name)) return exact.id;
+
+  for (const candidate of lowerCandidates) {
+    const partial = exTemplates.find((ex) =>
+      !excludedIds.has(ex.id) &&
+      ex.name.toLowerCase().includes(candidate) &&
+      !isGymOnlyExercise(ex.name)
+    );
+    if (partial) return partial.id;
+  }
+
+  return undefined;
+}
+
+function preferredGroupsFromDayTitle(title: string): MuscleBucket[] {
+  const t = title.toLowerCase();
+  if (t.includes("upper") && t.includes("push")) return ["chest", "shoulders", "triceps", "biceps"];
+  if (t.includes("upper") && t.includes("pull")) return ["back", "biceps", "shoulders", "triceps"];
+  if (t.includes("lower + back")) return ["legs", "back"];
+  if (t.includes("lower")) return ["legs", "back"];
+  if (t.includes("chest")) return ["chest", "biceps", "triceps"];
+  if (t.includes("back")) return ["back", "biceps"];
+  if (t.includes("shoulder")) return ["shoulders", "triceps", "chest"];
+  return ["other", "chest", "back", "legs", "shoulders", "biceps", "triceps"];
+}
+
+export function applyEquipmentToDayTemplates(
+  dayTemplates: DayTemplate[],
+  exTemplates: ExerciseTemplate[],
+  equipment: EquipmentType
+): DayTemplate[] {
+  if (equipment === "gym") return cloneDayTemplates(dayTemplates);
+
+  const exById = new Map(exTemplates.map((e) => [e.id, e]));
+  const adapted = cloneDayTemplates(dayTemplates);
+
+  for (const day of adapted) {
+    const nextIds: string[] = [];
+    const usedDayIds = new Set<string>();
+    const usedDayNames = new Set<string>();
+
+    for (const exId of day.exerciseTemplateIds) {
+      const ex = exById.get(exId);
+      if (!ex) continue;
+
+      if (!isGymOnlyExercise(ex.name)) {
+        if (usedDayIds.has(exId)) continue;
+        const key = normalizeName(ex.name);
+        if (usedDayNames.has(key)) continue;
+        nextIds.push(exId);
+        usedDayIds.add(exId);
+        usedDayNames.add(key);
+        continue;
+      }
+
+      const substituteId = findExistingExerciseIdByNames(
+        exTemplates,
+        substitutionNameCandidates(ex.name),
+        usedDayIds
+      );
+
+      if (substituteId) {
+        const sub = exById.get(substituteId);
+        const key = sub ? normalizeName(sub.name) : "";
+        if (key && usedDayNames.has(key)) continue;
+        nextIds.push(substituteId);
+        usedDayIds.add(substituteId);
+        if (sub) usedDayNames.add(normalizeName(sub.name));
+      } else {
+        console.warn(`[planGenerator] Dropping gym-only exercise for ${equipment} profile: ${ex.name}`);
+      }
+    }
+
+    day.exerciseTemplateIds = Array.from(new Set(nextIds));
+
+    // Try to satisfy must-have groups first (3-day/4-day builders and similar titles).
+    const mustHaveGroups = requiredGroupsForDayTitle(day.title);
+    const presentGroups = new Set(day.exerciseTemplateIds
+      .map((id) => exById.get(id))
+      .filter((x): x is ExerciseTemplate => !!x)
+      .map((ex) => classifyMuscleBucket(ex.name)));
+
+    for (const requiredGroup of mustHaveGroups) {
+      if (presentGroups.has(requiredGroup)) continue;
+      const candidate = exTemplates
+        .filter((ex) => !usedDayIds.has(ex.id))
+        .filter((ex) => !isGymOnlyExercise(ex.name))
+        .filter((ex) => equipment === "home" ? true : isHomeFriendly(ex.name))
+        .find((ex) => classifyMuscleBucket(ex.name) === requiredGroup);
+
+      if (candidate) {
+        const key = normalizeName(candidate.name);
+        if (usedDayNames.has(key)) continue;
+        day.exerciseTemplateIds.push(candidate.id);
+        usedDayIds.add(candidate.id);
+        usedDayNames.add(key);
+        presentGroups.add(requiredGroup);
+      }
+    }
+
+    // Try to refill day using home-friendly / non-gym-only options, but never reintroduce gym-only moves.
+    const preferredGroups = preferredGroupsFromDayTitle(day.title);
+    const canUseLegs = !day.title.toLowerCase().includes("upper");
+    const refillPool = exTemplates
+      .filter((ex) => !usedDayIds.has(ex.id))
+      .filter((ex) => !isGymOnlyExercise(ex.name))
+      .filter((ex) => isHomeFriendly(ex.name) || equipment === "home")
+      .sort((a, b) => {
+        const ga = classifyMuscleBucket(a.name);
+        const gb = classifyMuscleBucket(b.name);
+        const ia = preferredGroups.indexOf(ga);
+        const ib = preferredGroups.indexOf(gb);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+
+    for (const ex of refillPool) {
+      if (day.exerciseTemplateIds.length >= 7) break;
+      const group = classifyMuscleBucket(ex.name);
+      if (!canUseLegs && group === "legs") continue;
+      if (usedDayIds.has(ex.id)) continue;
+      const key = normalizeName(ex.name);
+      if (usedDayNames.has(key)) continue;
+      day.exerciseTemplateIds.push(ex.id);
+      usedDayIds.add(ex.id);
+      usedDayNames.add(key);
+      if (day.exerciseTemplateIds.length >= 5) break;
+    }
+
+    // Final strict pass: remove gym-only (paranoia) + dedupe.
+    const finalSeenNames = new Set<string>();
+    day.exerciseTemplateIds = day.exerciseTemplateIds.filter((id, idx, arr) => {
+      if (arr.indexOf(id) !== idx) return false;
+      const ex = exById.get(id);
+      if (!ex) return false;
+      const key = normalizeName(ex.name);
+      if (finalSeenNames.has(key)) return false;
+      if (isGymOnlyExercise(ex.name)) return false;
+      if (day.title.toLowerCase().includes("upper") && classifyMuscleBucket(ex.name) === "legs") return false;
+      finalSeenNames.add(key);
+      return true;
+    });
+
+    // If still underfilled, add best available unique home-friendly exercises (at least 4 if possible).
+    if (day.exerciseTemplateIds.length < 4) {
+      const emergencyPool = exTemplates
+        .filter((ex) => !day.exerciseTemplateIds.includes(ex.id))
+        .filter((ex) => !isGymOnlyExercise(ex.name))
+        .filter((ex) => equipment === "home" ? true : isHomeFriendly(ex.name));
+      for (const ex of emergencyPool) {
+        if (day.title.toLowerCase().includes("upper") && classifyMuscleBucket(ex.name) === "legs") continue;
+        const key = normalizeName(ex.name);
+        if (day.exerciseTemplateIds.some((id) => {
+          const existing = exById.get(id);
+          return existing ? normalizeName(existing.name) === key : false;
+        })) continue;
+        day.exerciseTemplateIds.push(ex.id);
+        if (day.exerciseTemplateIds.length >= 4) break;
+      }
+    }
+  }
+
+  return adapted;
 }
 
 export function computePlannedSets(exName: string, dayTypeOrTitle?: string): number {
@@ -226,6 +482,8 @@ type SplitDayConfig = {
 
 type CandidateExercise = {
   id: string;
+  name: string;
+  normalizedName: string;
   group: MuscleBucket;
   sourceOrder: number;
   compound: boolean;
@@ -322,6 +580,8 @@ function buildExerciseLibraryCandidates(
     const group = classifyMuscleBucket(ex.name);
     byGroup[group].push({
       id: ex.id,
+      name: ex.name,
+      normalizedName: normalizeName(ex.name),
       group,
       sourceOrder: sourceOrderById.get(ex.id) ?? (1000 + idx),
       compound: isCompoundExercise(ex.name),
@@ -356,6 +616,7 @@ function selectExercisesForDay(
 ): string[] {
   const selected: string[] = [];
   const selectedIds = new Set<string>();
+  const selectedNames = new Set<string>();
   const allowedGroups = allowedGroupsForConfig(config);
   const groupPointers = new Map<MuscleBucket, number>();
   const fallbackPointers = new Map<MuscleBucket, number>();
@@ -364,6 +625,7 @@ function selectExercisesForDay(
     if (!allowedGroups.includes(c.group)) return false;
     if (isUpperDayConfig(config) && c.group === "legs") return false;
     if (!allowDayDuplicates && selectedIds.has(c.id)) return false;
+    if (!allowDayDuplicates && selectedNames.has(c.normalizedName)) return false;
     if (!allowWeekDuplicates && usedWeekIds.has(c.id)) return false;
     return true;
   };
@@ -371,6 +633,7 @@ function selectExercisesForDay(
   const pushCandidate = (c: CandidateExercise, countAsUsed = true) => {
     selected.push(c.id);
     selectedIds.add(c.id);
+    selectedNames.add(c.normalizedName);
     if (countAsUsed) usedWeekIds.add(c.id);
   };
 
@@ -443,7 +706,13 @@ function selectExercisesForDay(
     while (selected.length < SLOT_RULES.min && fallbackPool.length > 0) {
       const c = fallbackPool[idx % fallbackPool.length];
       if (isUpperDayConfig(config) && c.group === "legs") break;
+      if (selectedNames.has(c.normalizedName)) {
+        idx += 1;
+        if (idx > fallbackPool.length * 2) break;
+        continue;
+      }
       selected.push(c.id);
+      selectedNames.add(c.normalizedName);
       idx += 1;
     }
   }
@@ -559,6 +828,57 @@ function cloneDayTemplates(days: DayTemplate[]): DayTemplate[] {
     ...d,
     exerciseTemplateIds: [...d.exerciseTemplateIds]
   }));
+}
+
+function dedupeAndRefillDayByName(
+  day: DayTemplate,
+  exTemplates: ExerciseTemplate[],
+  equipment: EquipmentType,
+  minExercises: number
+): DayTemplate {
+  const exById = new Map(exTemplates.map((e) => [e.id, e]));
+  const seen = new Set<string>();
+  const uniqueIds: string[] = [];
+
+  for (const id of day.exerciseTemplateIds) {
+    const ex = exById.get(id);
+    if (!ex) continue;
+    const key = normalizeName(ex.name);
+    if (seen.has(key)) continue;
+    if (equipment !== "gym" && isGymOnlyExercise(ex.name)) continue;
+    if (day.title.toLowerCase().includes("upper") && classifyMuscleBucket(ex.name) === "legs") continue;
+    seen.add(key);
+    uniqueIds.push(id);
+  }
+
+  if (uniqueIds.length < minExercises) {
+    const preferredGroups = preferredGroupsFromDayTitle(day.title);
+    const refillPool = exTemplates
+      .filter((ex) => !seen.has(normalizeName(ex.name)))
+      .filter((ex) => equipment === "gym" || !isGymOnlyExercise(ex.name))
+      .filter((ex) => equipment === "gym" || isHomeFriendly(ex.name))
+      .sort((a, b) => {
+        const ga = classifyMuscleBucket(a.name);
+        const gb = classifyMuscleBucket(b.name);
+        const ia = preferredGroups.indexOf(ga);
+        const ib = preferredGroups.indexOf(gb);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+
+    for (const ex of refillPool) {
+      if (uniqueIds.length >= minExercises) break;
+      if (day.title.toLowerCase().includes("upper") && classifyMuscleBucket(ex.name) === "legs") continue;
+      const key = normalizeName(ex.name);
+      if (seen.has(key)) continue;
+      uniqueIds.push(ex.id);
+      seen.add(key);
+    }
+  }
+
+  return {
+    ...day,
+    exerciseTemplateIds: uniqueIds
+  };
 }
 
 function applyGenerationConstraintsToDayTemplates(
@@ -749,6 +1069,8 @@ export async function createFirstWeekIfMissing(options?: { userId?: string; week
   if (!planTemplate) throw new Error("No plan template found. Seed failed?");
 
   const exercises = await db.exerciseTemplates.toArray();
+  const profile = await db.userProfiles.get(activeUserId);
+  const explicitTargetDays = profile?.daysPerWeek ?? 5;
   const weekNumber = options?.weekNumber ?? 1;
   const startDateISO = mondayOfTodayISO();
   const week = await generateWeekFromTemplate(
@@ -757,7 +1079,8 @@ export async function createFirstWeekIfMissing(options?: { userId?: string; week
     weekNumber,
     startDateISO,
     undefined,
-    activeUserId
+    activeUserId,
+    explicitTargetDays
   );
 
   await db.weekPlans.add(week);
@@ -769,12 +1092,17 @@ async function generateWeekFromTemplate(
   weekNumber: number,
   startDateISO: string,
   prevWeek: WeekPlan | undefined,
-  userId: string
+  userId: string,
+  explicitTargetDays?: 3 | 4 | 5
 ): Promise<WeekPlan> {
   const start = parseISO(startDateISO);
-  const userUnit: WeightUnit = (await db.userProfiles.get(userId))?.unit ?? "kg";
+  const userProfile = await db.userProfiles.get(userId);
+  const userUnit: WeightUnit = userProfile?.unit ?? "kg";
+  const userEquipment: EquipmentType = userProfile?.equipment ?? "gym";
 
-  const constraints = parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays);
+  const constraints = explicitTargetDays
+    ? parseGenerationConstraints(undefined, explicitTargetDays)
+    : parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays);
   const chosenBase: DayTemplate[] = remapDayTemplatesForTargetDays(plan, constraints.targetDays, exTemplates);
   const chosen: DayTemplate[] = applyGenerationConstraintsToDayTemplates(
     chosenBase,
@@ -782,8 +1110,13 @@ async function generateWeekFromTemplate(
     exTemplates,
     constraints
   );
+  const equipmentAdjusted: DayTemplate[] = applyEquipmentToDayTemplates(chosen, exTemplates, userEquipment);
+  const minExercisesPerDay = constraints.targetDays === 5 ? 1 : 5;
+  const finalizedTemplates = equipmentAdjusted.map((day) =>
+    dedupeAndRefillDayByName(day, exTemplates, userEquipment, minExercisesPerDay)
+  );
 
-  const days: WorkoutDay[] = chosen.map(dt => {
+  const days: WorkoutDay[] = finalizedTemplates.map(dt => {
     const date = addDays(start, dt.weekdayIndex);
     const dateISO = format(date, "yyyy-MM-dd");
 

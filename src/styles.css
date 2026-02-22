@@ -113,3 +113,139 @@ hr {
   gap: 8px;
   align-items: center;
 }
+
+.dayCardHeader {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.dayHeaderMain {
+  min-width: 0;
+}
+
+.dayToggle {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  background: #0b1220;
+  border: 1px solid #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dayToggleChevron {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.exerciseHeaderRow > .col {
+  min-width: 0;
+}
+
+.exerciseActionRow {
+  align-items: center;
+}
+
+.exerciseActionRow button {
+  white-space: normal;
+}
+
+.exerciseBaseField {
+  width: 160px;
+  max-width: 100%;
+}
+
+.setRowPlan {
+  grid-template-columns: 56px 110px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 60px;
+}
+
+.setHeaderRow {
+  align-items: center;
+}
+
+.setFieldLabel {
+  display: none;
+  font-size: 11px;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
+.setDataRow .setField {
+  min-width: 0;
+}
+
+.setFieldDone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .col {
+    min-width: 0;
+  }
+
+  .dayCardHeader {
+    grid-template-columns: auto 1fr;
+  }
+
+  .dayCardHeader .pill {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .exerciseBaseField {
+    width: 100%;
+  }
+
+  .exerciseHeaderRow {
+    align-items: stretch !important;
+  }
+
+  .exerciseActionRow {
+    width: 100%;
+  }
+
+  .exerciseActionRow button {
+    flex: 1 1 140px;
+  }
+
+  .setHeaderRow {
+    display: none;
+  }
+
+  .setDataRow {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    border: 1px solid #1f2937;
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .setFieldLabel {
+    display: block;
+  }
+
+  .setFieldSet,
+  .setFieldDone {
+    align-self: end;
+  }
+
+  .setFieldSet .pill {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .setFieldDone {
+    justify-content: flex-start;
+  }
+
+  .setFieldDone input[type="checkbox"] {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}

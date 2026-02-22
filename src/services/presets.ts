@@ -1,4 +1,5 @@
 import { db, getActiveUserId } from "../db/db";
+import { applyEquipmentToDayTemplates, remapDayTemplatesForTargetDays } from "./planGenerator";
 import type {
   DayTemplate,
   ExerciseTemplate,
@@ -72,12 +73,17 @@ async function buildWeekFromTemplate(
   plan: PlanTemplate,
   weekNumber: number,
   startDateISO: string,
-  userId: string
+  userId: string,
+  targetDays: 3 | 4 | 5
 ): Promise<WeekPlan> {
   const exTemplates = await db.exerciseTemplates.toArray();
   const exById = new Map(exTemplates.map((e) => [e.id, e]));
+  const remappedDays = remapDayTemplatesForTargetDays(plan, targetDays, exTemplates);
+  const profile = await db.userProfiles.get(userId);
+  const equipment = profile?.equipment ?? "gym";
+  const finalDays = applyEquipmentToDayTemplates(remappedDays, exTemplates, equipment);
 
-  const days: WorkoutDay[] = plan.dayTemplates
+  const days: WorkoutDay[] = finalDays
     .slice()
     .sort((a, b) => a.weekdayIndex - b.weekdayIndex)
     .map((dt) => ({
@@ -208,7 +214,9 @@ export async function initRithvikPresetWeek6ForUser(userId: string): Promise<voi
   }
 
   const plan = await getOrCreateRithvikPresetTemplate();
-  const week = await buildWeekFromTemplate(plan, 6, mondayOfThisWeekISO(), userId);
+  const profile = await db.userProfiles.get(userId);
+  const targetDays = profile?.daysPerWeek ?? 5;
+  const week = await buildWeekFromTemplate(plan, 6, mondayOfThisWeekISO(), userId, targetDays);
   await db.weekPlans.add(week);
 }
 
