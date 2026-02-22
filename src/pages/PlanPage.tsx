@@ -1,16 +1,22 @@
 import { useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db/db";
+import { db, getActiveUserId } from "../db/db";
 import type { WeekPlan } from "../db/types";
 import type { Unit } from "../services/units";
-import { generateNextWeek, getLatestWeek } from "../services/planGenerator";
+import { createFirstWeekIfMissing, generateNextWeek, getLatestWeek } from "../services/planGenerator";
 import WeekView from "./WeekView";
 import { initRithvikPresetWeek6 } from "../services/presets";
 
 export default function PlanPage() {
+  const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
+
   const weeks = useLiveQuery(
-    async () => db.weekPlans.orderBy("weekNumber").reverse().toArray(),
-    [],
+    async () => {
+      if (!activeUserId) return [];
+      const rows = await db.weekPlans.where("userId").equals(activeUserId).toArray();
+      return rows.sort((a, b) => b.weekNumber - a.weekNumber);
+    },
+    [activeUserId],
     [] as WeekPlan[]
   );
 
@@ -22,6 +28,12 @@ export default function PlanPage() {
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const setUnitForActiveProfile = async (nextUnit: Unit) => {
+    await db.settings.put({ key: "unit", value: nextUnit });
+    if (activeUserId) {
+      await db.userProfiles.update(activeUserId, { unit: nextUnit });
+    }
+  };
 
   // v0.3.2 UI: end-week-early flow
   const [endEarlyMode, setEndEarlyMode] = useState(false);
@@ -57,13 +69,13 @@ export default function PlanPage() {
           <div className="pill" style={{ display: "flex", gap: 8 }}>
             <button
               className={unit === "kg" ? "" : "secondary"}
-              onClick={() => db.settings.put({ key: "unit", value: "kg" })}
+              onClick={() => void setUnitForActiveProfile("kg")}
             >
               kg
             </button>
             <button
               className={unit === "lb" ? "" : "secondary"}
-              onClick={() => db.settings.put({ key: "unit", value: "lb" })}
+              onClick={() => void setUnitForActiveProfile("lb")}
             >
               lb
             </button>
@@ -99,9 +111,30 @@ export default function PlanPage() {
         <>
           <div className="card" style={{ background: "#0b1220" }}>
             <h3>Quick Start</h3>
-            <div className="small muted">Initialize your personal preset and start at Week 6.</div>
+            <div className="small muted">If no plan exists yet, create Week 1 or initialize the Rithvik preset.</div>
             <hr />
+            <div className="row" style={{ gap: 10 }}>
+              <button
+                disabled={busy}
+                onClick={async () => {
+                  setErr(null);
+                  setBusy(true);
+                  try {
+                    await createFirstWeekIfMissing();
+                    const latest = await getLatestWeek();
+                    if (latest) setSelectedWeekId(latest.id);
+                  } catch (e: any) {
+                    setErr(e?.message ?? "Could not create Week 1.");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Create Week 1
+              </button>
+            
             <button
+              className="secondary"
               disabled={busy}
               onClick={async () => {
                 setErr(null);
@@ -117,6 +150,7 @@ export default function PlanPage() {
             >
               Initialize Rithvik Preset (Start Week 6)
             </button>
+            </div>
           </div>
           <hr />
         </>

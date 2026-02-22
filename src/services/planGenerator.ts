@@ -1,5 +1,5 @@
 import { addDays, format, parseISO } from "date-fns";
-import { db } from "../db/db";
+import { db, getActiveUserId } from "../db/db";
 import type {
   PlannedExercise,
   SetEntry,
@@ -11,6 +11,14 @@ import type {
 } from "../db/types";
 
 const uid = () => crypto.randomUUID();
+type WeightUnit = "kg" | "lb";
+type NoteGroup = "chest" | "back" | "legs" | "arms" | "shoulders";
+type GenerationConstraints = {
+  targetDays: 3 | 4 | 5;
+  focusGroups: NoteGroup[];
+  avoidGroups: NoteGroup[];
+  timeCapMinutes?: number;
+};
 
 function inferNextWeekDays(notes?: string, explicit?: number): number {
   if (explicit && [3, 4, 5].includes(explicit)) return explicit;
@@ -34,6 +42,82 @@ function inferNextWeekDays(notes?: string, explicit?: number): number {
   }
 
   return 5;
+}
+
+function parseTimeCapMinutes(notes?: string): number | undefined {
+  const text = (notes ?? "").toLowerCase();
+  const minMatch = text.match(/\b(\d{1,3})\s*(min|mins|minute|minutes)\b/);
+  if (minMatch) return Number(minMatch[1]);
+
+  const hourMatch = text.match(/\b(\d{1,2})\s*(hour|hours|hr|hrs)\b/);
+  if (hourMatch) return Number(hourMatch[1]) * 60;
+
+  return undefined;
+}
+
+function containsAny(text: string, patterns: string[]): boolean {
+  return patterns.some((p) => text.includes(p));
+}
+
+function parseGroupMentions(notes?: string): Pick<GenerationConstraints, "focusGroups" | "avoidGroups"> {
+  const text = (notes ?? "").toLowerCase();
+  const groups: Array<{ key: NoteGroup; aliases: string[] }> = [
+    { key: "chest", aliases: ["chest", "pec"] },
+    { key: "back", aliases: ["back", "lats", "lat"] },
+    { key: "legs", aliases: ["legs", "leg", "quads", "hamstrings", "calves", "calf"] },
+    { key: "arms", aliases: ["arms", "arm", "biceps", "triceps"] },
+    { key: "shoulders", aliases: ["shoulders", "shoulder", "delts", "delt"] }
+  ];
+
+  const focusGroups: NoteGroup[] = [];
+  const avoidGroups: NoteGroup[] = [];
+
+  for (const group of groups) {
+    const wantsAvoid = group.aliases.some((alias) =>
+      containsAny(text, [
+        `no ${alias}`,
+        `avoid ${alias}`,
+        `skip ${alias}`,
+        `without ${alias}`,
+        `${alias} sore`,
+        `${alias} hurts`,
+        `${alias} hurt`
+      ])
+    );
+
+    if (wantsAvoid) {
+      avoidGroups.push(group.key);
+      continue;
+    }
+
+    const wantsFocus = group.aliases.some((alias) =>
+      containsAny(text, [
+        `focus ${alias}`,
+        `focus on ${alias}`,
+        `prioritize ${alias}`,
+        `more ${alias}`,
+        `extra ${alias}`,
+        `${alias} focus`
+      ])
+    );
+
+    if (wantsFocus) focusGroups.push(group.key);
+  }
+
+  return { focusGroups, avoidGroups };
+}
+
+function parseGenerationConstraints(notes?: string, explicitDays?: number): GenerationConstraints {
+  const parsedDays = inferNextWeekDays(notes, explicitDays);
+  const targetDays = (parsedDays === 3 || parsedDays === 4 || parsedDays === 5 ? parsedDays : 5) as 3 | 4 | 5;
+  const { focusGroups, avoidGroups } = parseGroupMentions(notes);
+
+  return {
+    targetDays,
+    focusGroups,
+    avoidGroups,
+    timeCapMinutes: parseTimeCapMinutes(notes)
+  };
 }
 
 function pickTemplateDays(dayTemplates: DayTemplate[], targetDays: number): DayTemplate[] {
@@ -132,71 +216,271 @@ export function computePlannedSets(exName: string, dayTypeOrTitle?: string): num
   return 3;
 }
 
-type DayLayout = { weekdayIndex: number; title: string };
-type BucketItem = { id: string; order: number; compound: boolean };
-type DayBucket = { items: BucketItem[]; idSet: Set<string> };
+type SplitDayConfig = {
+  weekdayIndex: number;
+  title: string;
+  primaryGroups: MuscleBucket[];
+  secondaryGroups?: MuscleBucket[];
+  upperOnly?: boolean;
+};
 
-function preferredBucketsFor3Days(group: MuscleBucket, sourceWeekday: number): number[] {
-  switch (group) {
-    case "chest":
-      return [0, 2];
-    case "triceps":
-      return [0, 2];
-    case "biceps":
-      return [0, 2];
-    case "legs":
-      return [1];
-    case "back":
-      return [1, 2];
-    case "shoulders":
-      return [2, 0];
-    default:
-      return sourceWeekday <= 1 ? [0, 2, 1] : sourceWeekday === 2 ? [1, 2, 0] : [2, 0, 1];
+type CandidateExercise = {
+  id: string;
+  group: MuscleBucket;
+  sourceOrder: number;
+  compound: boolean;
+  topCompound: boolean;
+};
+
+const SLOT_RULES = {
+  min: 5,
+  max: 7,
+  target: 6
+};
+
+function splitConfigsForTargetDays(targetDays: 3 | 4): SplitDayConfig[] {
+  if (targetDays === 3) {
+    return [
+      {
+        weekdayIndex: 0,
+        title: "Upper (Push focus)",
+        primaryGroups: ["chest", "shoulders", "triceps"],
+        secondaryGroups: ["biceps"],
+        upperOnly: true
+      },
+      {
+        weekdayIndex: 2,
+        title: "Lower + Back",
+        primaryGroups: ["legs", "back"]
+      },
+      {
+        weekdayIndex: 4,
+        title: "Upper (Pull + Shoulders)",
+        primaryGroups: ["back", "shoulders", "biceps"],
+        secondaryGroups: ["triceps"],
+        upperOnly: true
+      }
+    ];
   }
+
+  return [
+    {
+      weekdayIndex: 0,
+      title: "Upper (Push focus)",
+      primaryGroups: ["chest", "shoulders", "triceps"],
+      upperOnly: true
+    },
+    {
+      weekdayIndex: 1,
+      title: "Lower",
+      primaryGroups: ["legs"]
+    },
+    {
+      weekdayIndex: 3,
+      title: "Upper (Pull focus)",
+      primaryGroups: ["back", "biceps", "shoulders"],
+      upperOnly: true
+    },
+    {
+      weekdayIndex: 4,
+      title: "Lower (Posterior + Calves)",
+      primaryGroups: ["legs"],
+      secondaryGroups: ["back"]
+    }
+  ];
 }
 
-function preferredBucketsFor4Days(group: MuscleBucket, sourceWeekday: number): number[] {
-  switch (group) {
-    case "legs":
-      return [1, 3];
-    case "back":
-      return [2, 0];
-    case "chest":
-      return [0, 2];
-    case "shoulders":
-      return [0, 2];
-    case "biceps":
-      return [2, 0];
-    case "triceps":
-      return [0, 2];
-    default:
-      return sourceWeekday <= 1 ? [0, 2, 1, 3] : [2, 0, 3, 1];
-  }
+function isTopCompoundExercise(name: string): boolean {
+  const n = name.toLowerCase();
+  return ["bench", "incline", "row", "pulldown", "leg press", "shoulder press", "press"]
+    .some((k) => n.includes(k));
 }
 
-function pickBucketIndex(
-  buckets: DayBucket[],
-  preferred: number[],
-  exerciseId: string,
-  maxPerDay: number
-): number {
-  const preferredCandidates = preferred
-    .map((idx) => ({ idx, b: buckets[idx] }))
-    .filter(({ b }) => b.items.length < maxPerDay && !b.idSet.has(exerciseId));
+function buildExerciseLibraryCandidates(
+  plan: PlanTemplate,
+  exTemplates: ExerciseTemplate[]
+): Record<MuscleBucket, CandidateExercise[]> {
+  const byGroup: Record<MuscleBucket, CandidateExercise[]> = {
+    chest: [],
+    back: [],
+    legs: [],
+    shoulders: [],
+    biceps: [],
+    triceps: [],
+    other: []
+  };
 
-  if (preferredCandidates.length > 0) {
-    preferredCandidates.sort((a, b) => a.b.items.length - b.b.items.length);
-    return preferredCandidates[0].idx;
+  const sourceOrderById = new Map<string, number>();
+  let order = 0;
+  for (const day of plan.dayTemplates.slice().sort((a, b) => a.weekdayIndex - b.weekdayIndex)) {
+    for (const exId of day.exerciseTemplateIds) {
+      if (!sourceOrderById.has(exId)) sourceOrderById.set(exId, order++);
+    }
   }
 
-  const fallbackCandidates = buckets
-    .map((b, idx) => ({ idx, b }))
-    .filter(({ b }) => b.items.length < maxPerDay && !b.idSet.has(exerciseId));
+  exTemplates.forEach((ex, idx) => {
+    const group = classifyMuscleBucket(ex.name);
+    byGroup[group].push({
+      id: ex.id,
+      group,
+      sourceOrder: sourceOrderById.get(ex.id) ?? (1000 + idx),
+      compound: isCompoundExercise(ex.name),
+      topCompound: isTopCompoundExercise(ex.name)
+    });
+  });
 
-  if (fallbackCandidates.length === 0) return -1;
+  (Object.keys(byGroup) as MuscleBucket[]).forEach((group) => {
+    byGroup[group].sort((a, b) => {
+      if (a.topCompound !== b.topCompound) return a.topCompound ? -1 : 1;
+      if (a.compound !== b.compound) return a.compound ? -1 : 1;
+      return a.sourceOrder - b.sourceOrder;
+    });
+  });
 
-  fallbackCandidates.sort((a, b) => a.b.items.length - b.b.items.length);
-  return fallbackCandidates[0].idx;
+  return byGroup;
+}
+
+function isUpperDayConfig(config: SplitDayConfig): boolean {
+  return !!config.upperOnly;
+}
+
+function allowedGroupsForConfig(config: SplitDayConfig): MuscleBucket[] {
+  return [...config.primaryGroups, ...(config.secondaryGroups ?? [])]
+    .filter((g, idx, arr) => arr.indexOf(g) === idx);
+}
+
+function selectExercisesForDay(
+  config: SplitDayConfig,
+  pools: Record<MuscleBucket, CandidateExercise[]>,
+  usedWeekIds: Set<string>
+): string[] {
+  const selected: string[] = [];
+  const selectedIds = new Set<string>();
+  const allowedGroups = allowedGroupsForConfig(config);
+  const groupPointers = new Map<MuscleBucket, number>();
+  const fallbackPointers = new Map<MuscleBucket, number>();
+
+  const canUse = (c: CandidateExercise, allowWeekDuplicates: boolean, allowDayDuplicates: boolean) => {
+    if (!allowedGroups.includes(c.group)) return false;
+    if (isUpperDayConfig(config) && c.group === "legs") return false;
+    if (!allowDayDuplicates && selectedIds.has(c.id)) return false;
+    if (!allowWeekDuplicates && usedWeekIds.has(c.id)) return false;
+    return true;
+  };
+
+  const pushCandidate = (c: CandidateExercise, countAsUsed = true) => {
+    selected.push(c.id);
+    selectedIds.add(c.id);
+    if (countAsUsed) usedWeekIds.add(c.id);
+  };
+
+  // 1) Seed compounds first from primary groups
+  for (const group of config.primaryGroups) {
+    const pool = pools[group] ?? [];
+    const compound = pool.find((c) => c.compound && canUse(c, false, false));
+    if (compound && selected.length < SLOT_RULES.target) {
+      pushCandidate(compound);
+    }
+  }
+
+  // 2) Round-robin primary groups until target count
+  let safety = 0;
+  while (selected.length < SLOT_RULES.target && safety < 100) {
+    safety += 1;
+    let addedThisPass = false;
+    for (const group of config.primaryGroups) {
+      const pool = pools[group] ?? [];
+      let ptr = groupPointers.get(group) ?? 0;
+      while (ptr < pool.length && !canUse(pool[ptr], false, false)) ptr += 1;
+      groupPointers.set(group, ptr + 1);
+      if (ptr < pool.length) {
+        pushCandidate(pool[ptr]);
+        addedThisPass = true;
+        if (selected.length >= SLOT_RULES.target) break;
+      }
+    }
+    if (!addedThisPass) break;
+  }
+
+  // 3) Fill using secondary groups to minimum/target
+  for (const group of config.secondaryGroups ?? []) {
+    const pool = pools[group] ?? [];
+    for (const c of pool) {
+      if (selected.length >= SLOT_RULES.target) break;
+      if (!canUse(c, false, false)) continue;
+      pushCandidate(c);
+    }
+  }
+
+  // 4) Fill from any allowed groups up to min if still short
+  for (const group of allowedGroups) {
+    const pool = pools[group] ?? [];
+    let ptr = fallbackPointers.get(group) ?? 0;
+    while (selected.length < SLOT_RULES.min && ptr < pool.length) {
+      const c = pool[ptr++];
+      if (!canUse(c, false, false)) continue;
+      pushCandidate(c);
+    }
+    fallbackPointers.set(group, ptr);
+  }
+
+  // 5) Relax week-duplicate constraint (still avoid duplicates within same day) to hit min
+  if (selected.length < SLOT_RULES.min) {
+    for (const group of allowedGroups) {
+      for (const c of pools[group] ?? []) {
+        if (selected.length >= SLOT_RULES.min) break;
+        if (!canUse(c, true, false)) continue;
+        pushCandidate(c, false);
+      }
+    }
+  }
+
+  // 6) Last resort: allow same exercise repeated within the same day to guarantee no tiny day
+  if (selected.length < SLOT_RULES.min) {
+    const fallbackGroup = config.primaryGroups[0];
+    const fallbackPool = pools[fallbackGroup] ?? [];
+    let idx = 0;
+    while (selected.length < SLOT_RULES.min && fallbackPool.length > 0) {
+      const c = fallbackPool[idx % fallbackPool.length];
+      if (isUpperDayConfig(config) && c.group === "legs") break;
+      selected.push(c.id);
+      idx += 1;
+    }
+  }
+
+  return selected.slice(0, SLOT_RULES.max);
+}
+
+function buildIntentionalSplitDays(
+  plan: PlanTemplate,
+  exTemplates: ExerciseTemplate[],
+  targetDays: 3 | 4
+): DayTemplate[] | null {
+  const configs = splitConfigsForTargetDays(targetDays);
+  const pools = buildExerciseLibraryCandidates(plan, exTemplates);
+  const usedWeekIds = new Set<string>();
+
+  const built = configs.map((config) => ({
+    id: uid(),
+    title: config.title,
+    weekdayIndex: config.weekdayIndex,
+    exerciseTemplateIds: selectExercisesForDay(config, pools, usedWeekIds)
+  }));
+
+  const validCounts = built.every(
+    (d) => d.exerciseTemplateIds.length >= SLOT_RULES.min && d.exerciseTemplateIds.length <= SLOT_RULES.max
+  );
+  const noUpperLegs = built.every((day) => {
+    const config = configs.find((c) => c.weekdayIndex === day.weekdayIndex);
+    if (!config?.upperOnly) return true;
+    return day.exerciseTemplateIds.every((id) => {
+      const ex = exTemplates.find((e) => e.id === id);
+      return !ex || classifyMuscleBucket(ex.name) !== "legs";
+    });
+  });
+
+  if (!validCounts || !noUpperLegs) return null;
+  return built;
 }
 
 export function remapDayTemplatesForTargetDays(
@@ -208,64 +492,20 @@ export function remapDayTemplatesForTargetDays(
   if (targetDays === 5) return pickTemplateDays(sorted, 5);
   if (targetDays !== 3 && targetDays !== 4) return pickTemplateDays(sorted, 5);
 
-  const dayLayout: DayLayout[] =
-    targetDays === 3
-      ? [
-          { weekdayIndex: 0, title: "Upper Push + Arms" },
-          { weekdayIndex: 2, title: "Lower + Back" },
-          { weekdayIndex: 4, title: "Upper Pull + Shoulders/Arms" }
-        ]
-      : [
-          { weekdayIndex: 0, title: "Upper A (Push)" },
-          { weekdayIndex: 1, title: "Lower A" },
-          { weekdayIndex: 3, title: "Upper B (Pull)" },
-          { weekdayIndex: 4, title: "Lower B" }
-        ];
+  const built = buildIntentionalSplitDays(plan, exTemplates, targetDays);
+  if (built) return built;
 
-  const exById = new Map(exTemplates.map((e) => [e.id, e]));
-  const maxExercisesPerDay = 8;
-  const buckets: DayBucket[] = dayLayout.map(() => ({ items: [], idSet: new Set<string>() }));
-  let orderCounter = 0;
+  // Safe fallback: preserve original 3/4-day picks but update titles
+  const fallback = pickTemplateDays(sorted, targetDays);
+  const titleMap = new Map(
+    splitConfigsForTargetDays(targetDays).map((c) => [c.weekdayIndex, c.title] as const)
+  );
 
-  for (const sourceDay of sorted) {
-    for (const exId of sourceDay.exerciseTemplateIds) {
-      const exTemplate = exById.get(exId);
-      if (!exTemplate) continue;
-
-      const group = classifyMuscleBucket(exTemplate.name);
-      const preferred =
-        targetDays === 3
-          ? preferredBucketsFor3Days(group, sourceDay.weekdayIndex)
-          : preferredBucketsFor4Days(group, sourceDay.weekdayIndex);
-
-      const idx = pickBucketIndex(buckets, preferred, exId, maxExercisesPerDay);
-      if (idx === -1) continue;
-
-      buckets[idx].items.push({
-        id: exId,
-        order: orderCounter++,
-        compound: isCompoundExercise(exTemplate.name)
-      });
-      buckets[idx].idSet.add(exId);
-    }
-  }
-
-  return dayLayout.map((layout, idx) => {
-    const orderedExerciseIds = buckets[idx].items
-      .slice()
-      .sort((a, b) => {
-        if (a.compound !== b.compound) return a.compound ? -1 : 1;
-        return a.order - b.order;
-      })
-      .map((item) => item.id);
-
-    return {
-      id: uid(),
-      title: layout.title,
-      weekdayIndex: layout.weekdayIndex,
-      exerciseTemplateIds: orderedExerciseIds
-    };
-  });
+  return fallback.map((d) => ({
+    ...d,
+    title: titleMap.get(d.weekdayIndex) ?? d.title,
+    exerciseTemplateIds: d.exerciseTemplateIds.slice(0, SLOT_RULES.max)
+  }));
 }
 
 function mondayOfTodayISO(): string {
@@ -276,12 +516,17 @@ function mondayOfTodayISO(): string {
   return format(monday, "yyyy-MM-dd");
 }
 
-function makeSets(plannedSets: number, ex: ExerciseTemplate, plannedWeightKg?: number): SetEntry[] {
+function makeSets(
+  plannedSets: number,
+  ex: ExerciseTemplate,
+  plannedWeightKg?: number,
+  perSetPlannedWeightKg?: Array<number | undefined>
+): SetEntry[] {
   return Array.from({ length: plannedSets }, (_, i) => ({
     setNumber: i + 1,
     plannedRepsMin: ex.repRange.min,
     plannedRepsMax: ex.repRange.max,
-    plannedWeightKg,
+    plannedWeightKg: perSetPlannedWeightKg?.[i] ?? plannedWeightKg,
     actualReps: undefined,
     actualWeightKg: undefined,
     completed: false
@@ -297,49 +542,223 @@ function lastWeekExerciseSnapshot(prevWeek: WeekPlan | undefined, name: string) 
   return undefined;
 }
 
-function computeNextPlannedWeightKg(prev: PlannedExercise | undefined): number | undefined {
-  if (!prev) return undefined;
+function incrementKgForUnit(unit: WeightUnit): number {
+  const lbIncrementKg = 5 * 0.45359237;
+  return roundToNearest(unit === "lb" ? lbIncrementKg : 2.5, 0.5);
+}
 
-  const completedSets = prev.sets.filter(s => s.completed && typeof s.actualReps === "number");
-  if (completedSets.length === 0) return prev.plannedWeightKg;
+function lastDefinedNumber(values: Array<number | undefined>): number | undefined {
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (typeof values[i] === "number") return values[i];
+  }
+  return undefined;
+}
 
+function cloneDayTemplates(days: DayTemplate[]): DayTemplate[] {
+  return days.map((d) => ({
+    ...d,
+    exerciseTemplateIds: [...d.exerciseTemplateIds]
+  }));
+}
+
+function applyGenerationConstraintsToDayTemplates(
+  dayTemplates: DayTemplate[],
+  plan: PlanTemplate,
+  exTemplates: ExerciseTemplate[],
+  constraints: GenerationConstraints
+): DayTemplate[] {
+  const exById = new Map(exTemplates.map((e) => [e.id, e]));
+  const constrained = cloneDayTemplates(dayTemplates);
+
+  if (constraints.avoidGroups.includes("legs")) {
+    for (const day of constrained) {
+      day.exerciseTemplateIds = day.exerciseTemplateIds.filter((exId) => {
+        const ex = exById.get(exId);
+        return ex ? classifyMuscleBucket(ex.name) !== "legs" : true;
+      });
+    }
+  }
+
+  if (constraints.focusGroups.includes("chest")) {
+    const extraSlotsTarget = constraints.targetDays >= 4 ? 2 : 1;
+    const allPlannedIds = new Set(constrained.flatMap((d) => d.exerciseTemplateIds));
+    const chestCandidates = plan.dayTemplates
+      .slice()
+      .sort((a, b) => a.weekdayIndex - b.weekdayIndex)
+      .flatMap((d) => d.exerciseTemplateIds)
+      .filter((exId, idx, arr) => arr.indexOf(exId) === idx)
+      .filter((exId) => {
+        const ex = exById.get(exId);
+        return ex ? classifyMuscleBucket(ex.name) === "chest" : false;
+      });
+
+    const targetDays = constrained
+      .filter((d) => !d.title.toLowerCase().includes("lower"))
+      .sort((a, b) => a.exerciseTemplateIds.length - b.exerciseTemplateIds.length);
+
+    let added = 0;
+    for (const day of targetDays) {
+      if (added >= extraSlotsTarget) break;
+      const nextChestId =
+        chestCandidates.find((id) => !day.exerciseTemplateIds.includes(id) && !allPlannedIds.has(id)) ??
+        chestCandidates.find((id) => !day.exerciseTemplateIds.includes(id)) ??
+        chestCandidates[0];
+
+      if (!nextChestId) continue;
+      day.exerciseTemplateIds.push(nextChestId);
+      allPlannedIds.add(nextChestId);
+      added += 1;
+    }
+  }
+
+  return constrained;
+}
+
+function inferPrevBaseWeightKg(prev: PlannedExercise): number | undefined {
+  if (typeof prev.plannedWeightKg === "number") return prev.plannedWeightKg;
+  const firstPlannedSet = prev.sets.find((s) => typeof s.plannedWeightKg === "number")?.plannedWeightKg;
+  if (typeof firstPlannedSet === "number") return firstPlannedSet;
+
+  return lastDefinedNumber(prev.sets.map((s) => s.actualWeightKg));
+}
+
+function getPrevRampedOffsetsKg(prev: PlannedExercise, baseKg: number): number[] | undefined {
+  if (prev.sets.length === 0) return undefined;
+  const plannedSetWeights = prev.sets.map((s) => s.plannedWeightKg);
+  if (plannedSetWeights.some((w) => typeof w !== "number")) return undefined;
+
+  const offsets = plannedSetWeights.map((w) => roundToNearest((w as number) - baseKg, 0.5));
+  const hasRamp = offsets.some((o) => Math.abs(o) >= 0.01);
+  return hasRamp ? offsets : undefined;
+}
+
+function buildPlannedSetWeightsFromBase(
+  plannedSets: number,
+  baseKg: number | undefined,
+  rampOffsetsKg?: number[]
+): Array<number | undefined> {
+  if (typeof baseKg !== "number") {
+    return Array.from({ length: plannedSets }, () => undefined);
+  }
+
+  if (!rampOffsetsKg || rampOffsetsKg.length === 0) {
+    return Array.from({ length: plannedSets }, () => baseKg);
+  }
+
+  return Array.from({ length: plannedSets }, (_, idx) => {
+    const offset = rampOffsetsKg[idx] ?? 0;
+    return roundToNearest(baseKg + offset, 0.5);
+  });
+}
+
+type ProgressionSuggestion = {
+  baseWeightKg?: number;
+  rampOffsetsKg?: number[];
+};
+
+function computeNextProgressionSuggestion(
+  prev: PlannedExercise | undefined,
+  exName: string,
+  unit: WeightUnit
+): ProgressionSuggestion {
+  if (!prev) return {};
+  const incrementKg = incrementKgForUnit(unit);
+  const baseKg = inferPrevBaseWeightKg(prev);
+  const rampOffsetsKg = typeof baseKg === "number" ? getPrevRampedOffsetsKg(prev, baseKg) : undefined;
+  if (prev.sets.length === 0) return { baseWeightKg: baseKg, rampOffsetsKg };
+
+  const evaluated = prev.sets.map((s) => ({
+    hitMin: !!s.completed && typeof s.actualReps === "number" && s.actualReps >= prev.repRange.min,
+    completed: s.completed,
+    actualReps: s.actualReps,
+    usedWeightKg: s.actualWeightKg ?? s.plannedWeightKg ?? baseKg
+  }));
+
+  const totalSets = evaluated.length;
+  const hitMinCount = evaluated.filter((s) => s.hitMin).length;
+  const completedCount = evaluated.filter((s) => s.completed).length;
+  const majorityMissed = (totalSets - hitMinCount) > totalSets / 2;
+  const mostHitMin = hitMinCount >= Math.ceil(totalSets / 2);
+  const allHitMin = hitMinCount === totalSets;
+  const lastSetMissed = totalSets > 0 ? !evaluated[totalSets - 1].hitMin : false;
   const avgReps =
-    completedSets.reduce((sum, s) => sum + (s.actualReps ?? 0), 0) / completedSets.length;
+    (() => {
+      const repSets = evaluated.filter((s): s is typeof s & { actualReps: number } => typeof s.actualReps === "number");
+      if (repSets.length === 0) return undefined;
+      return repSets.reduce((sum, s) => sum + s.actualReps, 0) / repSets.length;
+    })();
 
-  const allSetsCompleted = prev.sets.every(s => s.completed);
+  let nextBaseKg = baseKg;
+  const compound = isCompoundExercise(exName);
+  const isolation = isIsolationExercise(exName);
 
-  const lastUsedWeight =
-    completedSets
-      .map(s => s.actualWeightKg)
-      .filter((x): x is number => typeof x === "number")
-      .slice(-1)[0] ?? prev.plannedWeightKg;
+  if (compound) {
+    if (typeof nextBaseKg !== "number") {
+      nextBaseKg = lastDefinedNumber(evaluated.map((s) => s.usedWeightKg));
+    }
 
-  if (typeof lastUsedWeight !== "number") return prev.plannedWeightKg;
+    if (typeof nextBaseKg === "number") {
+      if (allHitMin) {
+        nextBaseKg = roundToNearest(nextBaseKg + incrementKg, 0.5);
+      } else if (majorityMissed) {
+        nextBaseKg = roundToNearest(Math.max(0, nextBaseKg - incrementKg), 0.5);
+      } else if (mostHitMin && lastSetMissed) {
+        nextBaseKg = roundToNearest(nextBaseKg, 0.5);
+      }
+    }
+  } else if (isolation) {
+    if (typeof nextBaseKg !== "number") {
+      nextBaseKg = lastDefinedNumber(evaluated.map((s) => s.usedWeightKg));
+    }
 
-  const shouldIncrease = allSetsCompleted && avgReps >= prev.repRange.max;
-  return shouldIncrease ? roundToNearest(lastUsedWeight + 2.5, 0.5) : lastUsedWeight;
+    const mostCompleted = completedCount >= Math.ceil(totalSets / 2);
+    if (
+      typeof nextBaseKg === "number" &&
+      mostCompleted &&
+      typeof avgReps === "number" &&
+      avgReps >= prev.repRange.max
+    ) {
+      nextBaseKg = roundToNearest(nextBaseKg + incrementKg, 0.5);
+    }
+  } else if (typeof nextBaseKg !== "number") {
+    nextBaseKg = lastDefinedNumber(evaluated.map((s) => s.usedWeightKg));
+  }
+
+  return { baseWeightKg: nextBaseKg, rampOffsetsKg };
 }
 
 function roundToNearest(value: number, step: number) {
   return Math.round(value / step) * step;
 }
 
-export async function getLatestWeek(): Promise<WeekPlan | undefined> {
-  const all = await db.weekPlans.orderBy("weekNumber").reverse().toArray();
+export async function getLatestWeek(userId?: string): Promise<WeekPlan | undefined> {
+  const activeUserId = userId ?? await getActiveUserId();
+  if (!activeUserId) return undefined;
+  const all = await db.weekPlans.where("userId").equals(activeUserId).toArray();
+  all.sort((a, b) => b.weekNumber - a.weekNumber);
   return all[0];
 }
 
-export async function createFirstWeekIfMissing() {
-  const existing = await db.weekPlans.count();
+export async function createFirstWeekIfMissing(options?: { userId?: string; weekNumber?: number }) {
+  const activeUserId = options?.userId ?? await getActiveUserId();
+  if (!activeUserId) throw new Error("No active profile selected.");
+  const existing = await db.weekPlans.where("userId").equals(activeUserId).count();
   if (existing > 0) return;
 
   const planTemplate = await db.planTemplates.toCollection().first();
   if (!planTemplate) throw new Error("No plan template found. Seed failed?");
 
   const exercises = await db.exerciseTemplates.toArray();
-  const weekNumber = 1;
+  const weekNumber = options?.weekNumber ?? 1;
   const startDateISO = mondayOfTodayISO();
-  const week = await generateWeekFromTemplate(planTemplate, exercises, weekNumber, startDateISO, undefined);
+  const week = await generateWeekFromTemplate(
+    planTemplate,
+    exercises,
+    weekNumber,
+    startDateISO,
+    undefined,
+    activeUserId
+  );
 
   await db.weekPlans.add(week);
 }
@@ -349,12 +768,20 @@ async function generateWeekFromTemplate(
   exTemplates: ExerciseTemplate[],
   weekNumber: number,
   startDateISO: string,
-  prevWeek: WeekPlan | undefined
+  prevWeek: WeekPlan | undefined,
+  userId: string
 ): Promise<WeekPlan> {
   const start = parseISO(startDateISO);
+  const userUnit: WeightUnit = (await db.userProfiles.get(userId))?.unit ?? "kg";
 
-  const targetDays = inferNextWeekDays(prevWeek?.notes, prevWeek?.nextWeekDays);
-  const chosen: DayTemplate[] = remapDayTemplatesForTargetDays(plan, targetDays, exTemplates);
+  const constraints = parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays);
+  const chosenBase: DayTemplate[] = remapDayTemplatesForTargetDays(plan, constraints.targetDays, exTemplates);
+  const chosen: DayTemplate[] = applyGenerationConstraintsToDayTemplates(
+    chosenBase,
+    plan,
+    exTemplates,
+    constraints
+  );
 
   const days: WorkoutDay[] = chosen.map(dt => {
     const date = addDays(start, dt.weekdayIndex);
@@ -365,11 +792,17 @@ async function generateWeekFromTemplate(
       if (!exT) throw new Error("Missing exercise template");
 
       const prevEx = lastWeekExerciseSnapshot(prevWeek, exT.name);
-      const nextWeight = computeNextPlannedWeightKg(prevEx);
       const computedSets = computePlannedSets(exT.name, dt.title);
       const plannedSets = Number.isFinite(computedSets) && computedSets > 0
         ? computedSets
         : exT.defaultSets;
+      const progression = computeNextProgressionSuggestion(prevEx, exT.name, userUnit);
+      const nextWeight = progression?.baseWeightKg;
+      const perSetPlannedWeights = buildPlannedSetWeightsFromBase(
+        plannedSets,
+        nextWeight,
+        progression?.rampOffsetsKg
+      );
 
       return {
         id: uid(),
@@ -377,7 +810,7 @@ async function generateWeekFromTemplate(
         plannedSets,
         repRange: exT.repRange,
         plannedWeightKg: nextWeight,
-        sets: makeSets(plannedSets, exT, nextWeight)
+        sets: makeSets(plannedSets, exT, nextWeight, perSetPlannedWeights)
       };
     });
 
@@ -392,6 +825,7 @@ async function generateWeekFromTemplate(
 
   return {
     id: uid(),
+    userId,
     weekNumber,
     startDateISO,
     createdAtISO: new Date().toISOString(),
@@ -401,11 +835,13 @@ async function generateWeekFromTemplate(
 }
 
 export async function generateNextWeek() {
+  const activeUserId = await getActiveUserId();
+  if (!activeUserId) throw new Error("No active profile selected.");
   const planTemplate = await db.planTemplates.toCollection().first();
   if (!planTemplate) throw new Error("No plan template found.");
 
   const exTemplates = await db.exerciseTemplates.toArray();
-  const latest = await getLatestWeek();
+  const latest = await getLatestWeek(activeUserId);
 
   // Always lock previous week when moving forward
   if (latest && !latest.isLocked) {
@@ -417,7 +853,14 @@ export async function generateNextWeek() {
     ? format(addDays(parseISO(latest.startDateISO), 7), "yyyy-MM-dd")
     : mondayOfTodayISO();
 
-  const newWeek = await generateWeekFromTemplate(planTemplate, exTemplates, nextWeekNumber, nextStart, latest);
+  const newWeek = await generateWeekFromTemplate(
+    planTemplate,
+    exTemplates,
+    nextWeekNumber,
+    nextStart,
+    latest,
+    activeUserId
+  );
 
   await db.weekPlans.add(newWeek);
   return newWeek;

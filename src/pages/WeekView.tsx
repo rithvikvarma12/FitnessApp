@@ -2,9 +2,26 @@ import { useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import { db } from "../db/db";
 import type { Unit } from "../services/units";
-import { toDisplay, fromDisplay } from "../services/units";
+import { toDisplay, fromDisplay, lbToKg } from "../services/units";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { WeekPlan, WorkoutDay, PlannedExercise, SetEntry } from "../db/types";
+
+function lastNonEmptyActualWeightKg(ex: PlannedExercise): number | undefined {
+  for (let i = ex.sets.length - 1; i >= 0; i -= 1) {
+    const w = ex.sets[i].actualWeightKg;
+    if (typeof w === "number") return w;
+  }
+  return undefined;
+}
+
+function roundToNearest(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
+function rampIncrementKg(unit: Unit): number {
+  const raw = unit === "kg" ? 2.5 : lbToKg(5);
+  return roundToNearest(raw, 0.5);
+}
 
 export default function WeekView({ week }: { week: WeekPlan }) {
   const unit = useLiveQuery(async () => {
@@ -24,59 +41,127 @@ export default function WeekView({ week }: { week: WeekPlan }) {
   function setDayComplete(dayId: string, val: boolean) {
     const updated: WeekPlan = {
       ...week,
-      days: week.days.map(d => (d.id === dayId ? { ...d, isComplete: val } : d))
+      days: week.days.map((d) => (d.id === dayId ? { ...d, isComplete: val } : d))
     };
-    updateWeek(updated);
+    void updateWeek(updated);
   }
 
   function updateSet(dayId: string, exId: string, setNumber: number, patch: Partial<SetEntry>) {
     const updated: WeekPlan = {
       ...week,
-      days: week.days.map(d => {
+      days: week.days.map((d) => {
         if (d.id !== dayId) return d;
         return {
           ...d,
-          exercises: d.exercises.map(ex => {
+          exercises: d.exercises.map((ex) => {
             if (ex.id !== exId) return ex;
             return {
               ...ex,
-              sets: ex.sets.map(s => (s.setNumber === setNumber ? { ...s, ...patch } : s))
+              sets: ex.sets.map((s) => (s.setNumber === setNumber ? { ...s, ...patch } : s))
             };
           })
         };
       })
     };
-    updateWeek(updated);
+    void updateWeek(updated);
   }
 
-  function updatePlannedWeight(dayId: string, exId: string, weightKg?: number) {
+  // Base planned weight is separate from per-set planned weights. Quick actions copy it into sets.
+  function updateExerciseBasePlannedWeight(dayId: string, exId: string, weightKg?: number) {
     const updated: WeekPlan = {
       ...week,
-      days: week.days.map(d => {
+      days: week.days.map((d) => {
         if (d.id !== dayId) return d;
         return {
           ...d,
-          exercises: d.exercises.map(ex => {
+          exercises: d.exercises.map((ex) => (
+            ex.id !== exId
+              ? ex
+              : {
+                  ...ex,
+                  plannedWeightKg: weightKg
+                }
+          ))
+        };
+      })
+    };
+    void updateWeek(updated);
+  }
+
+  function applyBasePlannedWeightToAllSets(dayId: string, exId: string) {
+    const updated: WeekPlan = {
+      ...week,
+      days: week.days.map((d) => {
+        if (d.id !== dayId) return d;
+        return {
+          ...d,
+          exercises: d.exercises.map((ex) => {
             if (ex.id !== exId) return ex;
-            // Update planned weight AND default actual weight fields only if empty
             return {
               ...ex,
-              plannedWeightKg: weightKg,
-              sets: ex.sets.map(s => ({
+              sets: ex.sets.map((s) => ({ ...s, plannedWeightKg: ex.plannedWeightKg }))
+            };
+          })
+        };
+      })
+    };
+    void updateWeek(updated);
+  }
+
+  function applyRampPlannedWeights(dayId: string, exId: string) {
+    const incrementKg = rampIncrementKg(unit);
+    const updated: WeekPlan = {
+      ...week,
+      days: week.days.map((d) => {
+        if (d.id !== dayId) return d;
+        return {
+          ...d,
+          exercises: d.exercises.map((ex) => {
+            if (ex.id !== exId || typeof ex.plannedWeightKg !== "number") return ex;
+            const baseKg = ex.plannedWeightKg;
+            const splitIndex = Math.ceil(ex.sets.length / 2);
+            return {
+              ...ex,
+              sets: ex.sets.map((s, idx) => ({
                 ...s,
-                plannedWeightKg: weightKg,
-                actualWeightKg: s.actualWeightKg ?? weightKg
+                plannedWeightKg:
+                  idx < splitIndex
+                    ? baseKg
+                    : roundToNearest(baseKg + incrementKg, 0.5)
               }))
             };
           })
         };
       })
     };
-    updateWeek(updated);
+    void updateWeek(updated);
+  }
+
+  function setPlanToLastActual(dayId: string, exId: string) {
+    const updated: WeekPlan = {
+      ...week,
+      days: week.days.map((d) => {
+        if (d.id !== dayId) return d;
+        return {
+          ...d,
+          exercises: d.exercises.map((ex) => {
+            if (ex.id !== exId) return ex;
+            const lastActual = lastNonEmptyActualWeightKg(ex);
+            if (typeof lastActual !== "number") return ex;
+            return {
+              ...ex,
+              plannedWeightKg: lastActual,
+              sets: ex.sets.map((s) => ({ ...s, plannedWeightKg: lastActual }))
+            };
+          })
+        };
+      })
+    };
+    void updateWeek(updated);
   }
 
   const completion = useMemo(() => {
-    const done = week.days.filter(d => d.isComplete).length;
+    const done = week.days.filter((d) => d.isComplete).length;
     return `${done}/${week.days.length}`;
   }, [week.days]);
 
@@ -86,7 +171,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
         Week {week.weekNumber} • Start {week.startDateISO} • Days complete: {completion}
       </div>
 
-      {daysSorted.map(day => (
+      {daysSorted.map((day) => (
         <DayCard
           key={day.id}
           day={day}
@@ -94,7 +179,10 @@ export default function WeekView({ week }: { week: WeekPlan }) {
           isLocked={week.isLocked}
           onDayComplete={setDayComplete}
           onSetUpdate={updateSet}
-          onPlannedWeightUpdate={updatePlannedWeight}
+          onExerciseBasePlanUpdate={updateExerciseBasePlannedWeight}
+          onApplyBaseToAllSets={applyBasePlannedWeightToAllSets}
+          onRampPlanFromBase={applyRampPlannedWeights}
+          onSetPlanToLastActual={setPlanToLastActual}
         />
       ))}
     </div>
@@ -107,14 +195,20 @@ function DayCard({
   isLocked,
   onDayComplete,
   onSetUpdate,
-  onPlannedWeightUpdate
+  onExerciseBasePlanUpdate,
+  onApplyBaseToAllSets,
+  onRampPlanFromBase,
+  onSetPlanToLastActual
 }: {
   day: WorkoutDay;
   unit: Unit;
   isLocked: boolean;
   onDayComplete: (dayId: string, val: boolean) => void;
   onSetUpdate: (dayId: string, exId: string, setNumber: number, patch: Partial<SetEntry>) => void;
-  onPlannedWeightUpdate: (dayId: string, exId: string, weightKg?: number) => void;
+  onExerciseBasePlanUpdate: (dayId: string, exId: string, weightKg?: number) => void;
+  onApplyBaseToAllSets: (dayId: string, exId: string) => void;
+  onRampPlanFromBase: (dayId: string, exId: string) => void;
+  onSetPlanToLastActual: (dayId: string, exId: string) => void;
 }) {
   const dateLabel = format(parseISO(day.dateISO), "EEE, MMM d");
 
@@ -141,7 +235,7 @@ function DayCard({
       <hr />
 
       <div className="list">
-        {day.exercises.map(ex => (
+        {day.exercises.map((ex) => (
           <ExerciseCard
             key={ex.id}
             dayId={day.id}
@@ -149,7 +243,10 @@ function DayCard({
             unit={unit}
             isLocked={isLocked}
             onSetUpdate={onSetUpdate}
-            onPlannedWeightUpdate={onPlannedWeightUpdate}
+            onExerciseBasePlanUpdate={onExerciseBasePlanUpdate}
+            onApplyBaseToAllSets={onApplyBaseToAllSets}
+            onRampPlanFromBase={onRampPlanFromBase}
+            onSetPlanToLastActual={onSetPlanToLastActual}
           />
         ))}
       </div>
@@ -163,15 +260,24 @@ function ExerciseCard({
   unit,
   isLocked,
   onSetUpdate,
-  onPlannedWeightUpdate
+  onExerciseBasePlanUpdate,
+  onApplyBaseToAllSets,
+  onRampPlanFromBase,
+  onSetPlanToLastActual
 }: {
   dayId: string;
   ex: PlannedExercise;
   unit: Unit;
   isLocked: boolean;
   onSetUpdate: (dayId: string, exId: string, setNumber: number, patch: Partial<SetEntry>) => void;
-  onPlannedWeightUpdate: (dayId: string, exId: string, weightKg?: number) => void;
+  onExerciseBasePlanUpdate: (dayId: string, exId: string, weightKg?: number) => void;
+  onApplyBaseToAllSets: (dayId: string, exId: string) => void;
+  onRampPlanFromBase: (dayId: string, exId: string) => void;
+  onSetPlanToLastActual: (dayId: string, exId: string) => void;
 }) {
+  const lastActualWeightKg = lastNonEmptyActualWeightKg(ex);
+  const gridCols = "56px 110px 1fr 1fr 1fr 60px";
+
   return (
     <div className="card" style={{ background: "#0b1220" }}>
       <div className="row" style={{ alignItems: "center" }}>
@@ -179,6 +285,32 @@ function ExerciseCard({
           <div style={{ fontWeight: 700 }}>{ex.name}</div>
           <div className="small muted">
             {ex.plannedSets} sets • reps {ex.repRange.min}-{ex.repRange.max}
+          </div>
+          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            <button
+              className="secondary"
+              disabled={isLocked || typeof ex.plannedWeightKg !== "number"}
+              onClick={() => onApplyBaseToAllSets(dayId, ex.id)}
+              style={{ padding: "6px 10px", fontSize: 12 }}
+            >
+              Apply base to all
+            </button>
+            <button
+              className="secondary"
+              disabled={isLocked || typeof ex.plannedWeightKg !== "number"}
+              onClick={() => onRampPlanFromBase(dayId, ex.id)}
+              style={{ padding: "6px 10px", fontSize: 12 }}
+            >
+              Ramp
+            </button>
+            <button
+              className="secondary"
+              disabled={isLocked || typeof lastActualWeightKg !== "number"}
+              onClick={() => onSetPlanToLastActual(dayId, ex.id)}
+              style={{ padding: "6px 10px", fontSize: 12 }}
+            >
+              Set plan = last actual
+            </button>
           </div>
         </div>
 
@@ -196,26 +328,49 @@ function ExerciseCard({
                   ? undefined
                   : fromDisplay(num, unit);
 
-              onPlannedWeightUpdate(dayId, ex.id, kg);
+              onExerciseBasePlanUpdate(dayId, ex.id, kg);
             }}
           />
-          <div className="small muted">planned weight</div>
+          <div className="small muted">Base (optional)</div>
         </div>
       </div>
 
       <hr />
 
-      <div className="setRow small muted" style={{ marginBottom: 6 }}>
+      <div className="setRow small muted" style={{ marginBottom: 6, gridTemplateColumns: gridCols }}>
         <div>Set</div>
-        <div>Reps</div>
-        <div>{unit.toUpperCase()}</div>
+        <div>Planned reps</div>
+        <div>Planned weight</div>
+        <div>Actual reps</div>
+        <div>Actual weight</div>
         <div>Done</div>
       </div>
 
       <div className="list" style={{ gap: 8 }}>
-        {ex.sets.map(s => (
-          <div key={s.setNumber} className="setRow">
+        {ex.sets.map((s) => (
+          <div key={s.setNumber} className="setRow" style={{ gridTemplateColumns: gridCols }}>
             <div className="pill" style={{ justifyContent: "center" }}>{s.setNumber}</div>
+
+            <div className="pill" style={{ justifyContent: "center" }}>
+              {s.plannedRepsMin}-{s.plannedRepsMax}
+            </div>
+
+            <input
+              disabled={isLocked}
+              inputMode="decimal"
+              placeholder={typeof ex.plannedWeightKg === "number" ? String(toDisplay(ex.plannedWeightKg, unit)) : ""}
+              value={typeof s.plannedWeightKg === "number" ? toDisplay(s.plannedWeightKg, unit) : ""}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                const num = v === "" ? undefined : Number(v);
+                const kg =
+                  num === undefined || !Number.isFinite(num)
+                    ? undefined
+                    : fromDisplay(num, unit);
+
+                onSetUpdate(dayId, ex.id, s.setNumber, { plannedWeightKg: kg });
+              }}
+            />
 
             <input
               disabled={isLocked}
@@ -225,7 +380,9 @@ function ExerciseCard({
               onChange={(e) => {
                 const v = e.target.value.trim();
                 const num = v === "" ? undefined : Number(v);
-                onSetUpdate(dayId, ex.id, s.setNumber, { actualReps: Number.isFinite(num as number) ? (num as number) : undefined });
+                onSetUpdate(dayId, ex.id, s.setNumber, {
+                  actualReps: Number.isFinite(num as number) ? (num as number) : undefined
+                });
               }}
             />
 

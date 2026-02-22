@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Unit } from "../services/units";
 import { formatWeight, fromDisplay, toDisplay } from "../services/units";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db/db";
+import { db, getActiveUserId } from "../db/db";
 import type { WeightEntry } from "../db/types";
 import { format } from "date-fns";
 import { Line } from "react-chartjs-2";
@@ -31,9 +31,20 @@ function normalizeDateISO(value: string) {
 }
 
 export default function WeightPage() {
+  const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
+  const setUnitForActiveProfile = async (nextUnit: Unit) => {
+    await db.settings.put({ key: "unit", value: nextUnit });
+    if (activeUserId) {
+      await db.userProfiles.update(activeUserId, { unit: nextUnit });
+    }
+  };
+
   const entries = useLiveQuery(
-    async () => db.weightEntries.toArray(),
-    [],
+    async () => {
+      if (!activeUserId) return [];
+      return db.weightEntries.where("userId").equals(activeUserId).toArray();
+    },
+    [activeUserId],
     [] as WeightEntry[]
   );
 
@@ -134,16 +145,22 @@ export default function WeightPage() {
     const raw = Number(trimmed);
     if (!Number.isFinite(raw)) return;
 
+    const currentUserId = await getActiveUserId();
+    if (!currentUserId) return;
     const wKg = fromDisplay(raw, unit);
     const todayISO = format(new Date(), "yyyy-MM-dd");
     const createdAtISO = new Date().toISOString();
 
-    const existing = await db.weightEntries.where("dateISO").equals(todayISO).first();
+    const existing = await db.weightEntries
+      .where("[userId+dateISO]")
+      .equals([currentUserId, todayISO])
+      .first();
     if (existing) {
       await db.weightEntries.update(existing.id, { weightKg: wKg, createdAtISO, dateISO: todayISO });
     } else {
       await db.weightEntries.add({
         id: crypto.randomUUID(),
+        userId: currentUserId,
         dateISO: todayISO,
         weightKg: wKg,
         createdAtISO
@@ -178,7 +195,7 @@ export default function WeightPage() {
       <div className="pill" style={{ marginBottom: 10 }}>
         <button
           className={unit === "kg" ? "" : "secondary"}
-          onClick={() => db.settings.put({ key: "unit", value: "kg" })}
+          onClick={() => void setUnitForActiveProfile("kg")}
           style={{ marginRight: 8 }}
         >
           kg
@@ -186,7 +203,7 @@ export default function WeightPage() {
 
         <button
           className={unit === "lb" ? "" : "secondary"}
-          onClick={() => db.settings.put({ key: "unit", value: "lb" })}
+          onClick={() => void setUnitForActiveProfile("lb")}
         >
           lb
         </button>

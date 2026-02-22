@@ -1,4 +1,4 @@
-import { db } from "../db/db";
+import { db, getActiveUserId } from "../db/db";
 import type {
   DayTemplate,
   ExerciseTemplate,
@@ -9,13 +9,12 @@ import type {
   WorkoutDay
 } from "../db/types";
 
-// ---------- helpers ----------
 const uid = () => crypto.randomUUID();
 
 function mondayOfThisWeekISO(): string {
   const now = new Date();
-  const day = now.getDay(); // Sun=0
-  const diff = (day === 0 ? -6 : 1) - day; // move to Monday
+  const day = now.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
   const mon = new Date(now);
   mon.setDate(now.getDate() + diff);
   mon.setHours(0, 0, 0, 0);
@@ -36,12 +35,7 @@ async function getOrCreateExercise(
   const existing = await db.exerciseTemplates.where("name").equals(name).first();
   if (existing) return existing;
 
-  const ex: ExerciseTemplate = {
-    id: uid(),
-    name,
-    defaultSets,
-    repRange
-  };
+  const ex: ExerciseTemplate = { id: uid(), name, defaultSets, repRange };
   await db.exerciseTemplates.add(ex);
   return ex;
 }
@@ -54,7 +48,6 @@ async function exId(name: string): Promise<string> {
 
 function makePlannedExercise(exTemplate: ExerciseTemplate): PlannedExercise {
   const plannedSets = exTemplate.defaultSets;
-
   const sets: SetEntry[] = Array.from({ length: plannedSets }).map((_, i) => ({
     setNumber: i + 1,
     plannedRepsMin: exTemplate.repRange.min,
@@ -78,33 +71,29 @@ function makePlannedExercise(exTemplate: ExerciseTemplate): PlannedExercise {
 async function buildWeekFromTemplate(
   plan: PlanTemplate,
   weekNumber: number,
-  startDateISO: string
+  startDateISO: string,
+  userId: string
 ): Promise<WeekPlan> {
   const exTemplates = await db.exerciseTemplates.toArray();
-  const exById = new Map(exTemplates.map(e => [e.id, e]));
+  const exById = new Map(exTemplates.map((e) => [e.id, e]));
 
   const days: WorkoutDay[] = plan.dayTemplates
     .slice()
     .sort((a, b) => a.weekdayIndex - b.weekdayIndex)
-    .map((dt) => {
-      const dateISO = addDaysISO(startDateISO, dt.weekdayIndex);
-
-      const exercises: PlannedExercise[] = dt.exerciseTemplateIds
+    .map((dt) => ({
+      id: uid(),
+      title: dt.title,
+      dateISO: addDaysISO(startDateISO, dt.weekdayIndex),
+      isComplete: false,
+      exercises: dt.exerciseTemplateIds
         .map((id) => exById.get(id))
         .filter((x): x is ExerciseTemplate => !!x)
-        .map(makePlannedExercise);
-
-      return {
-        id: uid(),
-        title: dt.title,
-        dateISO,
-        isComplete: false,
-        exercises
-      };
-    });
+        .map(makePlannedExercise)
+    }));
 
   return {
     id: uid(),
+    userId,
     weekNumber,
     startDateISO,
     createdAtISO: new Date().toISOString(),
@@ -113,49 +102,31 @@ async function buildWeekFromTemplate(
   };
 }
 
-// ---------- main preset ----------
-export async function initRithvikPresetWeek6(): Promise<void> {
-  // If you already have weeks, don't overwrite anything.
-  const weekCount = await db.weekPlans.count();
-  if (weekCount > 0) {
-    throw new Error("Weeks already exist. Clear app data if you want to re-initialize.");
-  }
-
-  // Create exercise templates (minimal list based on your project split)
+async function getOrCreateRithvikPresetTemplate(): Promise<PlanTemplate> {
   await getOrCreateExercise("Middle Cable Crossover", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Low to High Cable Crossover", 3, { min: 12, max: 15 });
   await getOrCreateExercise("High to Low Cable Crossover", 3, { min: 12, max: 15 });
-
   await getOrCreateExercise("Flat Bench Press", 3, { min: 8, max: 12 });
   await getOrCreateExercise("Incline Bench Press", 3, { min: 8, max: 12 });
-
   await getOrCreateExercise("Barbell Curls", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Preacher Curls", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Hammer Curls", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Reverse Barbell Curls", 3, { min: 12, max: 15 });
-
   await getOrCreateExercise("Shoulder Press", 3, { min: 8, max: 12 });
   await getOrCreateExercise("Side Lateral Raise", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Rear Delt Pec Fly", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Dumbbell Raise", 3, { min: 12, max: 15 });
-
   await getOrCreateExercise("Tricep Pressdown", 3, { min: 10, max: 12 });
   await getOrCreateExercise("Cable Tricep Extension", 3, { min: 10, max: 12 });
-
   await getOrCreateExercise("Lat Pulldown", 3, { min: 10, max: 15 });
   await getOrCreateExercise("Seated Cable Row", 3, { min: 10, max: 15 });
-
   await getOrCreateExercise("Leg Press", 3, { min: 10, max: 15 });
   await getOrCreateExercise("Leg Extension", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Leg Curl", 3, { min: 12, max: 15 });
   await getOrCreateExercise("Calf Raises", 3, { min: 12, max: 15 });
 
-  // Create or reuse template
-  const existingTemplate = await db.planTemplates.where("name").equals("Rithvik Preset (Week 6)").first();
-  if (existingTemplate) {
-    // should never happen if weekCount is 0, but safe
-    throw new Error("Preset template already exists but weeks do not. Please clear app data.");
-  }
+  const existing = await db.planTemplates.where("name").equals("Rithvik Preset (Week 6)").first();
+  if (existing) return existing;
 
   const dayTemplates: DayTemplate[] = [
     {
@@ -225,18 +196,24 @@ export async function initRithvikPresetWeek6(): Promise<void> {
     }
   ];
 
-  const plan: PlanTemplate = {
-    id: uid(),
-    name: "Rithvik Preset (Week 6)",
-    dayTemplates
-  };
-
+  const plan: PlanTemplate = { id: uid(), name: "Rithvik Preset (Week 6)", dayTemplates };
   await db.planTemplates.add(plan);
+  return plan;
+}
 
-  // Create Week 6 starting this Monday
-  const weekNumber = 6;
-  const startDateISO = mondayOfThisWeekISO();
-  const week = await buildWeekFromTemplate(plan, weekNumber, startDateISO);
+export async function initRithvikPresetWeek6ForUser(userId: string): Promise<void> {
+  const weekCount = await db.weekPlans.where("userId").equals(userId).count();
+  if (weekCount > 0) {
+    throw new Error("Weeks already exist for this profile.");
+  }
 
+  const plan = await getOrCreateRithvikPresetTemplate();
+  const week = await buildWeekFromTemplate(plan, 6, mondayOfThisWeekISO(), userId);
   await db.weekPlans.add(week);
+}
+
+export async function initRithvikPresetWeek6(): Promise<void> {
+  const activeUserId = await getActiveUserId();
+  if (!activeUserId) throw new Error("No active profile selected.");
+  await initRithvikPresetWeek6ForUser(activeUserId);
 }

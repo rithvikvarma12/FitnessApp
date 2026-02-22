@@ -2,6 +2,18 @@ export type UUID = string;
 
 export type RepRange = { min: number; max: number };
 
+export type UserProfile = {
+  id: UUID;
+  name?: string;
+  unit: "kg" | "lb";
+  daysPerWeek: 3 | 4 | 5;
+  goal: "cut" | "maintain" | "gain";
+  experience: "beginner" | "intermediate";
+  equipment: "gym" | "home" | "minimal";
+  notes?: string;
+  createdAtISO: string;
+};
+
 export type ExerciseTemplate = {
   id: UUID;
   name: string;
@@ -52,6 +64,7 @@ export type WorkoutDay = {
 
 export type WeekPlan = {
   id: UUID;
+  userId: UUID;
   weekNumber: number;
   startDateISO: string;  // Monday
   createdAtISO: string;
@@ -64,6 +77,7 @@ export type WeekPlan = {
 
 export type WeightEntry = {
   id: UUID;
+  userId: UUID;
   dateISO: string;       // YYYY-MM-DD
   weightKg: number;
   createdAtISO: string;

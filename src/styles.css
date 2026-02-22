@@ -55,7 +55,7 @@ button:disabled {
   cursor: not-allowed;
 }
 
-input, select {
+input, select, textarea {
   width: 100%;
   background: #0b1220;
   color: #e5e7eb;
