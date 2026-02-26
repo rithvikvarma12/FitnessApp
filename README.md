@@ -1,77 +1,83 @@
-# React + TypeScript + Vite
+# FitnessApp (Cut/Gym PWA)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A mobile-first fitness PWA that generates weekly workout plans, tracks workouts set-by-set, and logs bodyweight with a trend chart.
 
-## Versioning
+- **Tech:** Vite + React + TypeScript
+- **Storage:** Dexie (IndexedDB) — local-first, offline
+- **Deploy:** Vercel (GitHub-connected)
+- **Install:** iPhone Safari → Share → Add to Home Screen
 
-- Current branch version: `v0.4.0-dev` (branch `v0.4`)
+---
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Weekly Plan
+- Generates **Week N+1** from Week N (progression-aware)
+- Supports **3 / 4 / 5-day weeks**
+- **End Week Early** supported (notes influence next week)
+- **kg/lb toggle** (display + inputs)
+- Per-day completion tracking + week locking flow
+- Set-level tracking:
+  - planned reps
+  - **planned weight per set**
+  - actual reps
+  - actual weight
+  - completed checkbox
 
-## React Compiler
+### Weight Tracker
+- Add bodyweight entries
+- Line chart shows weight trend
+- **Goal weight** line on chart
+- kg/lb support
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Version history (changelog)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### v0.1 — Skeleton MVP
+- Initial app scaffolding (Vite + React + TS)
+- Dexie DB setup (local-first)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### v0.2 — First working weekly plan
+- Basic weekly plan generation
+- Week view + set logging (reps/weight/done)
+- Simple progression (early version)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### v0.3 — Usable planner + mobile install
+- Deployed PWA (installable on iPhone)
+- Notes-driven next week days parsing (e.g., “3 days next week”)
+- End Week Early flow (generate next week even if not all days complete)
+- Unit setting (kg/lb) wired through UI
+- Weight tracker page added (initial)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### v0.4 — Daily-driver improvements + multi-user foundations
+- **Profiles / Onboarding** (multi-user ready)
+  - UserProfile table
+  - active user selection
+  - presets (including Rithvik preset starting Week 6)
+- **3/4/5-day generation fixed** to respect profile days/week
+- **Equipment-aware generation**
+  - gym vs home vs minimal
+  - home/minimal exercise pack seeded
+  - strict filtering (no gym-only exercises on home/minimal)
+- **Planned vs actual per set (B)**
+  - planned weight input shown per set next to actual
+  - helpers: Apply base to all, Ramp, Set plan = last actual
+- **Duplicates fixed**
+  - strict per-day dedupe by normalized exercise name + refill logic
+- **Mobile UX**
+  - collapsible day cards (open/close)
+  - improved responsiveness / reduced clutter
+- Weight tracker improvements
+  - ensure new entries show on chart
+  - goal weight line
+  - improved add-weight UI placement
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Run locally
+```bash
+npm install
+npm run dev
