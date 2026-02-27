@@ -4,7 +4,7 @@ This template provides a minimal setup to get React working in Vite with HMR and
 
 ## Versioning
 
-- Current branch version: `v0.4.0-dev` (branch `v0.4`)
+- Current branch version: v0.5 (in progress) (branch `v0.5`)
 
 Currently, two official plugins are available:
 
@@ -75,3 +75,4 @@ export default defineConfig([
   },
 ])
 ```
+

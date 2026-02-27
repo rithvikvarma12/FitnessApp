@@ -154,9 +154,165 @@ hr {
   white-space: normal;
 }
 
+.exerciseNameButton {
+  background: transparent;
+  border: 0;
+  color: #e5e7eb;
+  padding: 0;
+  font-weight: 700;
+  text-align: left;
+  border-radius: 6px;
+}
+
+.exerciseNameButton:hover {
+  color: #93c5fd;
+  border-color: transparent;
+}
+
 .exerciseBaseField {
   width: 160px;
   max-width: 100%;
+}
+
+.cardioBlockCard {
+  background: #052e2b;
+  border-color: #0f766e;
+  margin-bottom: 10px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.modalCard {
+  width: min(720px, 100%);
+  max-height: min(88vh, 800px);
+  overflow: auto;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.exerciseInfoModal {
+  display: grid;
+  gap: 12px;
+}
+
+.exerciseInfoHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.exerciseInfoImage {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #1f2937;
+}
+
+.exerciseInfoImagePlaceholder {
+  min-height: 120px;
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  background: #0b1220;
+}
+
+.muscleChipRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.muscleChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  color: #dbeafe;
+  border: 1px solid #2563eb;
+  font-size: 12px;
+}
+
+.secondaryMuscleChip {
+  background: #1f2937;
+  color: #d1d5db;
+  border-color: #374151;
+}
+
+.exerciseInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.exerciseInfoSection {
+  background: #111827;
+  border-radius: 12px;
+}
+
+.exerciseInfoList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.exerciseInfoList li + li {
+  margin-top: 4px;
+}
+
+.exerciseInfoActions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.exerciseAltList {
+  gap: 8px;
+}
+
+.exerciseAltItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.exerciseAltMain {
+  min-width: 0;
+  text-align: left;
+}
+
+.exerciseAltName {
+  font-weight: 700;
+}
+
+.exerciseHistoryRow {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.exerciseInfoLinkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2563eb;
+  color: #fff;
+  border: 1px solid #1d4ed8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .setRowPlan {
@@ -212,6 +368,47 @@ hr {
 
   .exerciseActionRow button {
     flex: 1 1 140px;
+  }
+
+  .modalBackdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modalCard {
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 16px 16px 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .exerciseInfoHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .exerciseInfoHeader button {
+    align-self: flex-end;
+  }
+
+  .exerciseInfoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .exerciseAltItem {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .exerciseAltItem button {
+    width: 100%;
+  }
+
+  .exerciseHistoryRow {
+    align-items: flex-start;
   }
 
   .setHeaderRow {
