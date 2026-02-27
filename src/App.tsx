@@ -7,8 +7,9 @@ import type { UserProfile } from "./db/types";
 import PlanPage from "./pages/PlanPage";
 import SetupPage from "./pages/SetupPage";
 import WeightPage from "./pages/WeightPage";
+import ProfilePage from "./pages/ProfilePage";
 
-type Tab = "plan" | "weight";
+type Tab = "plan" | "weight" | "profile";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("plan");
@@ -66,7 +67,7 @@ export default function App() {
           >
             {(profiles ?? []).map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name?.trim() || "Unnamed profile"} ({p.goal}, {p.daysPerWeek}d)
+                {p.name?.trim() || "Unnamed profile"} ({p.goalMode ?? (p.goal === "gain" ? "bulk" : p.goal) ?? "maintain"}, {p.daysPerWeek}d)
               </option>
             ))}
           </select>
@@ -80,9 +81,12 @@ export default function App() {
         <div className={`tab ${tab === "weight" ? "active" : ""}`} onClick={() => setTab("weight")}>
           Weight
         </div>
+        <div className={`tab ${tab === "profile" ? "active" : ""}`} onClick={() => setTab("profile")}>
+          Profile
+        </div>
       </div>
 
-      {tab === "plan" ? <PlanPage /> : <WeightPage />}
+      {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : <ProfilePage />}
       <div className="small muted" style={{ marginTop: 12 }}>
         Tip: On iPhone Safari → Share → Add to Home Screen.
       </div>

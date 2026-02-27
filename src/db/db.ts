@@ -1,19 +1,34 @@
 import Dexie from "dexie";
 import type { Table } from "dexie";
-import type { PlanTemplate, WeekPlan, WeightEntry, ExerciseTemplate, UserProfile } from "./types";
+import { deriveAutoCardio } from "../services/cardio";
+import type {
+  PlanTemplate,
+  WeekPlan,
+  WeightEntry,
+  ExerciseTemplate,
+  UserProfile,
+  ExerciseMeta,
+  ExerciseMetaType
+} from "./types";
 
 export type Setting = { key: string; value: string };
 const uid = () => crypto.randomUUID();
 
 function makeDefaultProfile(id: string, unit: "kg" | "lb"): UserProfile {
+  const cardio = deriveAutoCardio("cut", 5);
   return {
     id,
     name: "Default",
     unit,
     daysPerWeek: 5,
+    goalMode: "cut",
     goal: "cut",
     experience: "beginner",
     equipment: "gym",
+    cardioGoalAuto: cardio.cardioGoalAuto,
+    cardioType: cardio.cardioType,
+    cardioSessionsPerWeek: cardio.cardioSessionsPerWeek,
+    cardioMinutesPerSession: cardio.cardioMinutesPerSession,
     createdAtISO: new Date().toISOString()
   };
 }
@@ -21,6 +36,7 @@ function makeDefaultProfile(id: string, unit: "kg" | "lb"): UserProfile {
 export class AppDB extends Dexie {
   planTemplates!: Table<PlanTemplate, string>;
   exerciseTemplates!: Table<ExerciseTemplate, string>;
+  exerciseMeta!: Table<ExerciseMeta, string>;
   weekPlans!: Table<WeekPlan, string>;
   weightEntries!: Table<WeightEntry, string>;
   userProfiles!: Table<UserProfile, string>;
@@ -93,6 +109,67 @@ export class AppDB extends Dexie {
           });
         }
       });
+
+    // v4 (exercise metadata)
+    this.version(4).stores({
+      planTemplates: "id, name",
+      exerciseTemplates: "id, name",
+      exerciseMeta: "exerciseTemplateId",
+      weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
+      weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
+      settings: "key",
+      userProfiles: "id, createdAtISO"
+    });
+
+    // v5 (cardio profile preferences)
+    this.version(5)
+      .stores({
+        planTemplates: "id, name",
+        exerciseTemplates: "id, name",
+        exerciseMeta: "exerciseTemplateId",
+        weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
+        weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
+        settings: "key",
+        userProfiles: "id, createdAtISO"
+      })
+      .upgrade(async (tx) => {
+        const userProfilesTable = tx.table("userProfiles") as Table<UserProfile, string>;
+        await userProfilesTable.toCollection().modify((profile) => {
+          const cardioGoal = profile.goalMode ?? (profile.goal === "gain" ? "bulk" : profile.goal) ?? "maintain";
+          const cardio = deriveAutoCardio(cardioGoal, profile.daysPerWeek ?? 4);
+          if (typeof profile.cardioGoalAuto !== "boolean") profile.cardioGoalAuto = true;
+          if (!profile.cardioType) profile.cardioType = cardio.cardioType;
+          if (!Number.isFinite(profile.cardioSessionsPerWeek)) {
+            profile.cardioSessionsPerWeek = cardio.cardioSessionsPerWeek;
+          }
+          if (!Number.isFinite(profile.cardioMinutesPerSession)) {
+            profile.cardioMinutesPerSession = cardio.cardioMinutesPerSession;
+          }
+        });
+      });
+
+    // v6 (goalMode + onboarding weights)
+    this.version(6)
+      .stores({
+        planTemplates: "id, name",
+        exerciseTemplates: "id, name",
+        exerciseMeta: "exerciseTemplateId",
+        weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
+        weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
+        settings: "key",
+        userProfiles: "id, createdAtISO"
+      })
+      .upgrade(async (tx) => {
+        const userProfilesTable = tx.table("userProfiles") as Table<UserProfile, string>;
+        await userProfilesTable.toCollection().modify((profile) => {
+          if (!profile.goalMode) {
+            profile.goalMode = profile.goal === "gain" ? "bulk" : profile.goal ?? "maintain";
+          }
+          if (!profile.goal) {
+            profile.goal = profile.goalMode === "bulk" ? "gain" : profile.goalMode;
+          }
+        });
+      });
   }
 }
 
@@ -108,4 +185,44 @@ export async function getActiveUserId(): Promise<string | undefined> {
     return firstProfile.id;
   }
   return undefined;
+}
+
+export async function getExerciseMeta(exerciseTemplateId: string): Promise<ExerciseMeta | undefined> {
+  return db.exerciseMeta.get(exerciseTemplateId);
+}
+
+export function classifyCompound(name: string): ExerciseMetaType {
+  const n = name.toLowerCase();
+  const compoundKeywords = [
+    "bench",
+    "press",
+    "row",
+    "pulldown",
+    "pull-up",
+    "pull up",
+    "chin-up",
+    "chin up",
+    "squat",
+    "deadlift",
+    "rdl",
+    "lunge",
+    "leg press",
+    "carry",
+    "push-up",
+    "push up"
+  ];
+
+  const isolationKeywords = [
+    "crossover",
+    "fly",
+    "curl",
+    "raise",
+    "pressdown",
+    "extension",
+    "plank"
+  ];
+
+  if (isolationKeywords.some((k) => n.includes(k))) return "isolation";
+  if (compoundKeywords.some((k) => n.includes(k))) return "compound";
+  return "isolation";
 }

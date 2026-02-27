@@ -20,6 +20,8 @@ type GenerationConstraints = {
   timeCapMinutes?: number;
 };
 type EquipmentType = "gym" | "home" | "minimal";
+type GoalMode = "cut" | "maintain" | "bulk";
+const MAX_EXERCISES_PER_DAY_HARD = 8;
 
 function normalizeName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
@@ -405,7 +407,7 @@ export function applyEquipmentToDayTemplates(
       });
 
     for (const ex of refillPool) {
-      if (day.exerciseTemplateIds.length >= 7) break;
+      if (day.exerciseTemplateIds.length >= MAX_EXERCISES_PER_DAY_HARD) break;
       const group = classifyMuscleBucket(ex.name);
       if (!canUseLegs && group === "legs") continue;
       if (usedDayIds.has(ex.id)) continue;
@@ -453,7 +455,7 @@ export function applyEquipmentToDayTemplates(
   return adapted;
 }
 
-export function computePlannedSets(exName: string, dayTypeOrTitle?: string): number {
+export function computePlannedSets(exName: string, dayTypeOrTitle?: string, goalMode: GoalMode = "maintain"): number {
   const isCompound = isCompoundExercise(exName);
   const isIsolation = isIsolationExercise(exName);
   const dayTitle = (dayTypeOrTitle ?? "").toLowerCase();
@@ -462,8 +464,16 @@ export function computePlannedSets(exName: string, dayTypeOrTitle?: string): num
     dayTitle.includes("lower + back") ||
     dayTitle.includes("upper pull + shoulders/arms");
 
-  if (isCompound) return 4;
-  if (isIsolation) return 3;
+  if (isCompound) {
+    if (goalMode === "cut") return 3;
+    if (goalMode === "bulk") return 4;
+    return 4;
+  }
+  if (isIsolation) {
+    if (goalMode === "cut") return 2;
+    if (goalMode === "bulk") return 4;
+    return 3;
+  }
 
   if (condensedThreeDay && (dayTitle.includes("upper") || dayTitle.includes("lower"))) {
     return 4;
@@ -492,7 +502,7 @@ type CandidateExercise = {
 
 const SLOT_RULES = {
   min: 5,
-  max: 7,
+  max: MAX_EXERCISES_PER_DAY_HARD,
   target: 6
 };
 
@@ -1051,6 +1061,60 @@ function roundToNearest(value: number, step: number) {
   return Math.round(value / step) * step;
 }
 
+function normalizeGoal(goal?: "cut" | "maintain" | "gain" | "bulk"): GoalMode {
+  if (goal === "cut") return "cut";
+  if (goal === "gain" || goal === "bulk") return "bulk";
+  return "maintain";
+}
+
+function exerciseCapForGoal(goal: GoalMode): number {
+  if (goal === "cut") return 6;
+  if (goal === "bulk") return 8;
+  return 7;
+}
+
+function cardioPrescriptionForGoal(goal: GoalMode): {
+  sessionsPerWeek: number;
+  minutes: number;
+  intensity: "easy" | "moderate" | "hard";
+} {
+  if (goal === "cut") return { sessionsPerWeek: 4, minutes: 25, intensity: "moderate" };
+  if (goal === "bulk") return { sessionsPerWeek: 2, minutes: 15, intensity: "easy" };
+  return { sessionsPerWeek: 3, minutes: 20, intensity: "easy" };
+}
+
+function isLegDayTitle(title: string): boolean {
+  const t = title.toLowerCase();
+  return t.includes("leg") || t.includes("lower");
+}
+
+function attachCardioBlocks(days: WorkoutDay[], goal: GoalMode): WorkoutDay[] {
+  const plan = cardioPrescriptionForGoal(goal);
+  const targetSessions = Math.min(plan.sessionsPerWeek, days.length);
+  if (targetSessions <= 0) return days;
+
+  const preferred = days.filter((d) => !isLegDayTitle(d.title));
+  const fallback = days.filter((d) => isLegDayTitle(d.title));
+  const chosen = [...preferred, ...fallback].slice(0, targetSessions);
+  const chosenIds = new Set(chosen.map((d) => d.id));
+  const modalities: Array<"Treadmill" | "Stairmaster" | "Bike" | "Row"> = ["Treadmill", "Stairmaster", "Bike"];
+  let modalityIdx = 0;
+
+  return days.map((day) => {
+    if (!chosenIds.has(day.id)) return day;
+    const modality = modalities[modalityIdx % modalities.length];
+    modalityIdx += 1;
+    return {
+      ...day,
+      cardio: {
+        modality,
+        minutes: plan.minutes,
+        intensity: plan.intensity
+      }
+    };
+  });
+}
+
 export async function getLatestWeek(userId?: string): Promise<WeekPlan | undefined> {
   const activeUserId = userId ?? await getActiveUserId();
   if (!activeUserId) return undefined;
@@ -1099,10 +1163,13 @@ async function generateWeekFromTemplate(
   const userProfile = await db.userProfiles.get(userId);
   const userUnit: WeightUnit = userProfile?.unit ?? "kg";
   const userEquipment: EquipmentType = userProfile?.equipment ?? "gym";
+  const goalMode: GoalMode = normalizeGoal(userProfile?.goalMode ?? userProfile?.goal);
+  const exerciseCap = exerciseCapForGoal(goalMode);
 
+  const profileDefaultDays = userProfile?.daysPerWeek;
   const constraints = explicitTargetDays
     ? parseGenerationConstraints(undefined, explicitTargetDays)
-    : parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays);
+    : parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays ?? profileDefaultDays);
   const chosenBase: DayTemplate[] = remapDayTemplatesForTargetDays(plan, constraints.targetDays, exTemplates);
   const chosen: DayTemplate[] = applyGenerationConstraintsToDayTemplates(
     chosenBase,
@@ -1112,9 +1179,12 @@ async function generateWeekFromTemplate(
   );
   const equipmentAdjusted: DayTemplate[] = applyEquipmentToDayTemplates(chosen, exTemplates, userEquipment);
   const minExercisesPerDay = constraints.targetDays === 5 ? 1 : 5;
-  const finalizedTemplates = equipmentAdjusted.map((day) =>
-    dedupeAndRefillDayByName(day, exTemplates, userEquipment, minExercisesPerDay)
-  );
+  const finalizedTemplates = equipmentAdjusted
+    .map((day) => dedupeAndRefillDayByName(day, exTemplates, userEquipment, minExercisesPerDay))
+    .map((day) => ({
+      ...day,
+      exerciseTemplateIds: day.exerciseTemplateIds.slice(0, exerciseCap)
+    }));
 
   const days: WorkoutDay[] = finalizedTemplates.map(dt => {
     const date = addDays(start, dt.weekdayIndex);
@@ -1125,7 +1195,7 @@ async function generateWeekFromTemplate(
       if (!exT) throw new Error("Missing exercise template");
 
       const prevEx = lastWeekExerciseSnapshot(prevWeek, exT.name);
-      const computedSets = computePlannedSets(exT.name, dt.title);
+      const computedSets = computePlannedSets(exT.name, dt.title, goalMode);
       const plannedSets = Number.isFinite(computedSets) && computedSets > 0
         ? computedSets
         : exT.defaultSets;
@@ -1156,13 +1226,15 @@ async function generateWeekFromTemplate(
     };
   });
 
+  const daysWithCardio = attachCardioBlocks(days, goalMode);
+
   return {
     id: uid(),
     userId,
     weekNumber,
     startDateISO,
     createdAtISO: new Date().toISOString(),
-    days,
+    days: daysWithCardio,
     isLocked: false
   };
 }

@@ -3,7 +3,7 @@ import type { Unit } from "../services/units";
 import { formatWeight, fromDisplay, toDisplay } from "../services/units";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, getActiveUserId } from "../db/db";
-import type { WeightEntry } from "../db/types";
+import type { WeightEntry, UserProfile } from "../db/types";
 import { format } from "date-fns";
 import { Line } from "react-chartjs-2";
 import {
@@ -16,6 +16,7 @@ import {
   Legend
 } from "chart.js";
 import { movingAverage } from "../services/stats";
+import GoalReachedBanner from "../components/GoalReachedBanner";
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 
@@ -52,12 +53,20 @@ export default function WeightPage() {
     const s = await db.settings.get("unit");
     return (s?.value as Unit) ?? "kg";
   }, [], "kg" as Unit);
+  const activeProfile = useLiveQuery(
+    async () => (activeUserId ? db.userProfiles.get(activeUserId) : undefined),
+    [activeUserId]
+  );
 
   const goalWeightKg = useLiveQuery(async () => {
+    if (activeProfile && typeof activeProfile.targetWeightKg === "number") {
+      return activeProfile.targetWeightKg;
+    }
+    // deprecated fallback: legacy settings key
     const s = await db.settings.get("goalWeightKg");
     const n = Number(s?.value);
     return Number.isFinite(n) ? n : null;
-  }, [], null as number | null);
+  }, [activeProfile], null as number | null);
 
   const [newWeight, setNewWeight] = useState("");
   const [goalWeightInput, setGoalWeightInput] = useState("");
@@ -172,9 +181,11 @@ export default function WeightPage() {
 
   const handleSaveGoal = async () => {
     const trimmed = goalWeightInput.trim();
+    const currentUserId = await getActiveUserId();
+    if (!currentUserId) return;
 
     if (!trimmed) {
-      await db.settings.delete("goalWeightKg");
+      await db.userProfiles.update(currentUserId, { targetWeightKg: undefined } as Partial<UserProfile>);
       return;
     }
 
@@ -182,13 +193,17 @@ export default function WeightPage() {
     if (!Number.isFinite(raw)) return;
 
     const goalKg = fromDisplay(raw, unit);
-    await db.settings.put({ key: "goalWeightKg", value: String(goalKg) });
+    await db.userProfiles.update(currentUserId, { targetWeightKg: goalKg } as Partial<UserProfile>);
   };
 
   return (
     <div className="card">
       <h2>Weight Tracker</h2>
       <div className="small muted">Add your weight daily. Trend uses a 7-day average.</div>
+
+      <hr />
+
+      <GoalReachedBanner userId={activeUserId} unit={unit} />
 
       <hr />
 
@@ -276,7 +291,11 @@ export default function WeightPage() {
             </div>
             <button
               className="secondary"
-              onClick={() => db.weightEntries.delete(e.id)}
+              onClick={async () => {
+                const confirmed = window.confirm("Delete this weight entry?");
+                if (!confirmed) return;
+                await db.weightEntries.delete(e.id);
+              }}
               style={{ marginLeft: "auto" }}
             >
               Delete

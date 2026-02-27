@@ -3,9 +3,14 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, getActiveUserId } from "../db/db";
 import type { WeekPlan } from "../db/types";
 import type { Unit } from "../services/units";
+import { toDisplay } from "../services/units";
 import { createFirstWeekIfMissing, generateNextWeek, getLatestWeek } from "../services/planGenerator";
+import { format, parseISO } from "date-fns";
 import WeekView from "./WeekView";
 import { initRithvikPresetWeek6 } from "../services/presets";
+import GoalReachedBanner from "../components/GoalReachedBanner";
+import { weeklyTrendFromWindow } from "../services/stats";
+import { deriveAutoCardio } from "../services/cardio";
 
 export default function PlanPage() {
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
@@ -24,6 +29,19 @@ export default function PlanPage() {
     const s = await db.settings.get("unit");
     return (s?.value as Unit) ?? "kg";
   }, [], "kg" as Unit);
+  const activeProfile = useLiveQuery(
+    async () => (activeUserId ? db.userProfiles.get(activeUserId) : undefined),
+    [activeUserId]
+  );
+  const recentWeightEntries = useLiveQuery(
+    async () => {
+      if (!activeUserId) return [];
+      const rows = await db.weightEntries.where("userId").equals(activeUserId).toArray();
+      return rows.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+    },
+    [activeUserId],
+    []
+  );
 
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -53,6 +71,111 @@ export default function PlanPage() {
     const missed = total - done;
     return { done, total, missed, allComplete: missed === 0 };
   }, [selected]);
+  const cardioSummary = useMemo(() => {
+    if (!selected) return undefined;
+    const cardioDays = selected.days
+      .slice()
+      .sort((a, b) => a.dateISO.localeCompare(b.dateISO))
+      .filter((d) => !!d.cardio);
+
+    const sessionsPerWeek = cardioDays.length;
+    const modalities = Array.from(
+      new Set(cardioDays.map((d) => d.cardio?.modality).filter((m): m is NonNullable<typeof m> => !!m))
+    );
+    const minutesList = cardioDays
+      .map((d) => d.cardio?.minutes)
+      .filter((m): m is number => Number.isFinite(m));
+    const intensityList = cardioDays
+      .map((d) => d.cardio?.intensity)
+      .filter((i): i is "easy" | "moderate" | "hard" => !!i);
+    const weekdayLabels = cardioDays.map((d) => format(parseISO(d.dateISO), "EEE"));
+
+    const modalityLabel =
+      modalities.length === 0 ? "-" : modalities.length === 1 ? modalities[0] : "Mixed";
+    const intensityLabel =
+      intensityList.length === 0
+        ? "-"
+        : Array.from(new Set(intensityList)).length === 1
+          ? intensityList[0]
+          : "mixed";
+    const minuteLabel = (() => {
+      if (minutesList.length === 0) return "-";
+      const min = Math.min(...minutesList);
+      const max = Math.max(...minutesList);
+      return min === max ? `${min} min / session` : `${min}-${max} min / session`;
+    })();
+    const suggestedSchedule =
+      weekdayLabels.length > 0
+        ? `Post-workout ${weekdayLabels.join("/")}`
+        : "No cardio prescribed this week";
+
+    return {
+      sessionsPerWeek,
+      modalityLabel,
+      minuteLabel,
+      intensityLabel,
+      suggestedSchedule
+    };
+  }, [selected]);
+  const progressSummary = useMemo(() => {
+    const latest = recentWeightEntries.length ? recentWeightEntries[recentWeightEntries.length - 1] : undefined;
+    const latestKg = latest?.weightKg;
+    const targetKg = activeProfile?.targetWeightKg;
+    const goalMode = activeProfile?.goalMode ?? (activeProfile?.goal === "gain" ? "bulk" : activeProfile?.goal) ?? "maintain";
+
+    const deltaKg =
+      typeof latestKg === "number" && typeof targetKg === "number"
+        ? (goalMode === "bulk" ? targetKg - latestKg : latestKg - targetKg)
+        : null;
+
+    const fourteenDay = recentWeightEntries.slice(-14).map((e) => ({ dateISO: e.dateISO, value: e.weightKg }));
+    const trendKgPerWeek = weeklyTrendFromWindow(fourteenDay);
+
+    return {
+      latestLabel: typeof latestKg === "number" ? `${toDisplay(latestKg, unit).toFixed(1)} ${unit}` : "—",
+      targetLabel: typeof targetKg === "number" ? `${toDisplay(targetKg, unit).toFixed(1)} ${unit}` : "—",
+      deltaLabel:
+        deltaKg === null
+          ? "—"
+          : `${deltaKg >= 0 ? "+" : "-"}${Math.abs(toDisplay(deltaKg, unit)).toFixed(1)} ${unit}`,
+      trendLabel:
+        trendKgPerWeek === null
+          ? "—"
+          : `${trendKgPerWeek >= 0 ? "+" : "-"}${Math.abs(toDisplay(trendKgPerWeek, unit)).toFixed(2)} ${unit}/week`
+    };
+  }, [recentWeightEntries, activeProfile, unit]);
+  const generationContext = useMemo(() => {
+    const goalMode = activeProfile?.goalMode ?? (activeProfile?.goal === "gain" ? "bulk" : activeProfile?.goal) ?? "maintain";
+    const targetLabel =
+      typeof activeProfile?.targetWeightKg === "number"
+        ? `${toDisplay(activeProfile.targetWeightKg, unit).toFixed(1)} ${unit}`
+        : "—";
+
+    const weekCardioDays = selected?.days.filter((d) => !!d.cardio) ?? [];
+    const hasWeekCardio = weekCardioDays.length > 0;
+
+    const cardioSessions = hasWeekCardio
+      ? weekCardioDays.length
+      : deriveAutoCardio(goalMode, activeProfile?.daysPerWeek ?? 4).cardioSessionsPerWeek;
+    const cardioMinutesLabel = (() => {
+      if (hasWeekCardio) {
+        const mins = weekCardioDays.map((d) => d.cardio?.minutes).filter((m): m is number => Number.isFinite(m));
+        if (mins.length === 0) return "-";
+        const min = Math.min(...mins);
+        const max = Math.max(...mins);
+        return min === max ? `${min}` : `${min}-${max}`;
+      }
+      return String(deriveAutoCardio(goalMode, activeProfile?.daysPerWeek ?? 4).cardioMinutesPerSession);
+    })();
+
+    return {
+      goalMode,
+      targetLabel,
+      daysPerWeek: activeProfile?.daysPerWeek ?? 4,
+      cardioSessions,
+      cardioMinutesLabel
+    };
+  }, [activeProfile, selected, unit]);
 
   return (
     <div className="card">
@@ -105,6 +228,50 @@ export default function PlanPage() {
       </div>
 
       <hr />
+
+      <GoalReachedBanner userId={activeUserId} unit={unit} />
+
+      <div className="row" style={{ gap: 8, marginTop: 10, marginBottom: 10 }}>
+        <span className="pill">Latest: {progressSummary.latestLabel}</span>
+        <span className="pill">Target: {progressSummary.targetLabel}</span>
+        <span className="pill">Remaining: {progressSummary.deltaLabel}</span>
+        <span className="pill">Trend (14d): {progressSummary.trendLabel}</span>
+      </div>
+
+      {selected && cardioSummary && (
+        <>
+          <div className="card" style={{ background: "#0b1220" }}>
+            <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <h3>Cardio</h3>
+                <div className="small muted">
+                  Summary from this week's assigned cardio blocks.
+                </div>
+              </div>
+              <div className="row" style={{ gap: 8 }}>
+                <span className="pill">{cardioSummary.modalityLabel}</span>
+                <span className="pill">
+                  {cardioSummary.sessionsPerWeek}x / week
+                </span>
+                <span className="pill">
+                  {cardioSummary.minuteLabel}
+                </span>
+                <span className="pill">
+                  {cardioSummary.intensityLabel}
+                </span>
+              </div>
+            </div>
+
+            <hr />
+
+            <div className="row" style={{ alignItems: "center", gap: 12 }}>
+              <div className="small muted">Suggested schedule</div>
+              <div style={{ fontWeight: 700 }}>{cardioSummary.suggestedSchedule}</div>
+            </div>
+          </div>
+          <hr />
+        </>
+      )}
 
       {/* QUICK START (ONLY IF NO WEEKS EXIST YET) */}
       {isEmpty && (
@@ -265,6 +432,10 @@ export default function PlanPage() {
       <hr />
 
       <div className="row" style={{ alignItems: "center", gap: 12 }}>
+        <div className="small muted" style={{ width: "100%" }}>
+          Generating using: {generationContext.goalMode} • target {generationContext.targetLabel} • {generationContext.daysPerWeek} days/week • cardio {generationContext.cardioSessions}x/week, {generationContext.cardioMinutesLabel} min/session
+        </div>
+
         {/* Normal generate: locked until all days complete */}
         <button
           disabled={busy || !selected || !!selected?.isLocked || !completion.allComplete}

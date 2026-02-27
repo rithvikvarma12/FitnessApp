@@ -28,6 +28,10 @@ function addDaysISO(startISO: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function roundToNearest(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
 async function getOrCreateExercise(
   name: string,
   defaultSets: number,
@@ -45,6 +49,201 @@ async function exId(name: string): Promise<string> {
   const ex = await db.exerciseTemplates.where("name").equals(name).first();
   if (!ex) throw new Error(`Missing exercise template: ${name}`);
   return ex.id;
+}
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().trim();
+}
+
+function isCompoundName(name: string): boolean {
+  const n = normalizeName(name);
+  return [
+    "bench",
+    "press",
+    "row",
+    "pulldown",
+    "squat",
+    "deadlift",
+    "lunge",
+    "leg press"
+  ].some((k) => n.includes(k));
+}
+
+function isIsolationName(name: string): boolean {
+  const n = normalizeName(name);
+  return [
+    "curl",
+    "raise",
+    "extension",
+    "pressdown",
+    "crossover",
+    "fly"
+  ].some((k) => n.includes(k));
+}
+
+function exerciseBaseWeightKg(name: string, equipment: "gym" | "home" | "minimal"): { base: number; increment: number } {
+  const n = normalizeName(name);
+  if (n.includes("flat bench")) return { base: 45, increment: 1.0 };
+  if (n.includes("incline bench")) return { base: 40, increment: 0.8 };
+  if (n.includes("lat pulldown")) return { base: 50, increment: 1.0 };
+  if (n.includes("seated cable row")) return { base: 45, increment: 1.0 };
+  if (n.includes("one-arm dumbbell row")) return { base: 22.5, increment: 0.5 };
+  if (n.includes("shoulder press")) return { base: equipment === "gym" ? 30 : 20, increment: 0.5 };
+  if (n.includes("leg press")) return { base: 100, increment: 2.5 };
+  if (n.includes("goblet squat")) return { base: 20, increment: 1.0 };
+  if (n.includes("romanian deadlift")) return { base: 35, increment: 1.0 };
+  if (n.includes("barbell curls")) return { base: 20, increment: 0.5 };
+  if (n.includes("dumbbell bicep curl")) return { base: 10, increment: 0.5 };
+  if (n.includes("tricep pressdown")) return { base: 25, increment: 0.5 };
+  if (n.includes("tricep extension")) return { base: 12.5, increment: 0.5 };
+  if (n.includes("side lateral raise") || n.includes("dumbbell raise")) return { base: 7.5, increment: 0.5 };
+
+  if (isCompoundName(name)) return { base: 30, increment: 0.8 };
+  if (isIsolationName(name)) return { base: 12.5, increment: 0.4 };
+  return { base: 15, increment: 0.4 };
+}
+
+function fillExerciseWithDemoActuals(
+  exercise: PlannedExercise,
+  weekIndex: number,
+  dayIndex: number,
+  equipment: "gym" | "home" | "minimal"
+): PlannedExercise {
+  const progression = exerciseBaseWeightKg(exercise.name, equipment);
+  const workingWeight = roundToNearest(progression.base + progression.increment * weekIndex, 0.5);
+
+  const sets = exercise.sets.map((set, setIdx) => {
+    const completed = ((weekIndex + dayIndex + setIdx) % 7) !== 0; // mostly complete
+    const repSpan = Math.max(0, set.plannedRepsMax - set.plannedRepsMin);
+    const reps = completed
+      ? set.plannedRepsMin + ((weekIndex + setIdx) % (repSpan + 1 || 1))
+      : undefined;
+
+    const perSetAdj = isCompoundName(exercise.name)
+      ? (setIdx >= Math.floor(exercise.sets.length / 2) ? 2.5 : 0)
+      : 0;
+    const actualWeightKg = completed
+      ? roundToNearest(Math.max(0, workingWeight + perSetAdj), 0.5)
+      : undefined;
+
+    return {
+      ...set,
+      plannedWeightKg: roundToNearest(Math.max(0, workingWeight), 0.5),
+      completed,
+      actualReps: reps,
+      actualWeightKg
+    };
+  });
+
+  return {
+    ...exercise,
+    plannedWeightKg: roundToNearest(Math.max(0, workingWeight), 0.5),
+    sets
+  };
+}
+
+function decorateWeekWithDemoActuals(
+  week: WeekPlan,
+  weekIndex: number,
+  equipment: "gym" | "home" | "minimal"
+): WeekPlan {
+  const days = week.days.map((day, dayIndex) => {
+    const exercises = day.exercises.map((ex) =>
+      fillExerciseWithDemoActuals(ex, weekIndex, dayIndex, equipment)
+    );
+    const totalSets = exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
+    const doneSets = exercises.reduce((acc, ex) => acc + ex.sets.filter((s) => s.completed).length, 0);
+    const isComplete = totalSets === 0 ? false : doneSets / totalSets >= 0.7;
+    return { ...day, exercises, isComplete };
+  });
+
+  return {
+    ...week,
+    isLocked: week.weekNumber < 10,
+    days
+  };
+}
+
+async function seedDemoWeightEntries(userId: string, goal: "cut" | "maintain" | "bulk" | "gain") {
+  await db.weightEntries.where("userId").equals(userId).delete();
+
+  const today = new Date();
+  const entries: Array<{
+    id: string;
+    userId: string;
+    dateISO: string;
+    weightKg: number;
+    createdAtISO: string;
+  }> = [];
+
+  const startWeightKg = goal === "cut" ? 86 : goal === "maintain" ? 80 : 78;
+
+  for (let i = 59; i >= 0; i -= 1) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateISO = d.toISOString().slice(0, 10);
+
+    const trendDelta =
+      goal === "cut"
+        ? -0.03 * (59 - i)
+        : goal === "maintain"
+          ? 0
+          : 0.02 * (59 - i);
+    const noise = ((i % 5) - 2) * 0.05;
+    const weightKg = roundToNearest(startWeightKg + trendDelta + noise, 0.1);
+
+    entries.push({
+      id: uid(),
+      userId,
+      dateISO,
+      weightKg,
+      createdAtISO: new Date(d.getTime() + 1000 * 60 * 60 * 12).toISOString()
+    });
+  }
+
+  await db.weightEntries.bulkPut(entries);
+}
+
+export async function initDemoPresetForUser(userId: string): Promise<void> {
+  const weekCount = await db.weekPlans.where("userId").equals(userId).count();
+  if (weekCount > 0) {
+    throw new Error("Weeks already exist for this profile.");
+  }
+
+  const plan = await db.planTemplates.toCollection().first();
+  if (!plan) throw new Error("No plan template found.");
+
+  const profile = await db.userProfiles.get(userId);
+  if (!profile) throw new Error("Profile not found.");
+  const resolvedGoal = profile.goalMode ?? (profile.goal === "gain" ? "bulk" : profile.goal) ?? "maintain";
+  const defaultTargetKg =
+    resolvedGoal === "cut"
+      ? 78
+      : resolvedGoal === "maintain"
+        ? profile.currentWeightKg ?? 80
+        : 84;
+  await db.userProfiles.update(userId, {
+    goalMode: resolvedGoal,
+    goal: resolvedGoal === "bulk" ? "gain" : resolvedGoal,
+    currentWeightKg: profile.currentWeightKg ?? 86,
+    targetWeightKg: profile.targetWeightKg ?? defaultTargetKg
+  });
+
+  const targetDays = profile.daysPerWeek ?? 5;
+  const equipment = profile.equipment ?? "gym";
+  const monday = mondayOfThisWeekISO();
+  const startWeek1ISO = addDaysISO(monday, -63); // 10 weeks ending on current week
+
+  const weeks: WeekPlan[] = [];
+  for (let weekNum = 1; weekNum <= 10; weekNum += 1) {
+    const startDateISO = addDaysISO(startWeek1ISO, (weekNum - 1) * 7);
+    const rawWeek = await buildWeekFromTemplate(plan, weekNum, startDateISO, userId, targetDays);
+    const withActuals = decorateWeekWithDemoActuals(rawWeek, weekNum - 1, equipment);
+    weeks.push(withActuals);
+  }
+
+  await db.weekPlans.bulkAdd(weeks);
+  await seedDemoWeightEntries(userId, resolvedGoal);
 }
 
 function makePlannedExercise(exTemplate: ExerciseTemplate): PlannedExercise {
