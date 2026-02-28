@@ -208,22 +208,6 @@ Simple enough for daily use
 
 Structured enough to scale later
 
-🔮 Future Direction (v0.6+ Ideas)
-
-Adaptive load calibration based on bodyweight
-
-Plateau detection & auto cardio adjustment
-
-Smart deload detection
-
-Cloud sync
-
-Multi-user support
-
-AI-based weekly optimization
-
-Exercise video/image expansion
-
 ⚠️ Notes
 
 All data is local to device unless exported.
