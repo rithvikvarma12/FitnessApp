@@ -1,4 +1,4 @@
-import type { WeekPlan, PlannedExercise, SetEntry } from "../db/types";
+import type { WeekPlan } from "../db/types";
 import { toDisplay } from "./units";
 import type { Unit } from "./units";
 
