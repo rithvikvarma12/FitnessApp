@@ -1,0 +1,449 @@
+/* ── Progress Dashboard ───────────────────────────────────────────────── */
+
+.progress-page {
+  display: grid;
+  gap: 14px;
+}
+
+/* ── Stats Grid ───────────────────────────────────────────────────────── */
+
+.progress-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .progress-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.progress-stat-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-left: 4px solid #3b82f6;
+  border-radius: 12px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-stat-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.progress-stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f3f4f6;
+  line-height: 1.1;
+}
+
+.progress-stat-label {
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.3;
+}
+
+/* ── Section Title ────────────────────────────────────────────────────── */
+
+.progress-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e5e7eb;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Recent PRs Banner ────────────────────────────────────────────────── */
+
+.progress-prs-banner {
+  background: #1c1400;
+  border: 1px solid #713f12;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.progress-prs-list {
+  display: grid;
+  gap: 8px;
+}
+
+.progress-pr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.progress-pr-name {
+  font-weight: 600;
+  color: #fde68a;
+  flex: 1 1 160px;
+}
+
+.progress-pr-weight {
+  font-size: 13px;
+  color: #e5e7eb;
+}
+
+.progress-pr-delta {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+/* ── Weekly Volume Chart ──────────────────────────────────────────────── */
+
+.progress-chart-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+/* ── Muscle Group Breakdown ───────────────────────────────────────────── */
+
+.progress-muscle-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.progress-muscle-list {
+  display: grid;
+  gap: 12px;
+}
+
+.progress-muscle-row {
+  display: grid;
+  gap: 6px;
+}
+
+.progress-muscle-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.progress-muscle-stats {
+  color: #9ca3af;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.progress-muscle-bar-track {
+  height: 8px;
+  background: #1f2937;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-muscle-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+/* ── PR Board ─────────────────────────────────────────────────────────── */
+
+.progress-pr-board {
+  display: grid;
+  gap: 12px;
+}
+
+.progress-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.progress-filter-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.progress-filter-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: #1f2937;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.progress-filter-pill--active {
+  border-color: #3b82f6;
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+.progress-sort-select {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.progress-pr-board-list {
+  display: grid;
+  gap: 8px;
+}
+
+.progress-pr-board-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #0b1220;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.progress-pr-board-medal {
+  font-size: 16px;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.progress-pr-board-name {
+  font-weight: 600;
+  color: #e5e7eb;
+  flex: 1 1 160px;
+}
+
+.progress-pr-board-weight {
+  font-size: 13px;
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.progress-pr-board-meta {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ── Top Exercises ────────────────────────────────────────────────────── */
+
+.progress-top-exercises {
+  display: grid;
+  gap: 12px;
+}
+
+.progress-exercise-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.progress-exercise-card {
+  background: #0b1220;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.progress-exercise-name {
+  font-weight: 700;
+  color: #e5e7eb;
+  font-size: 14px;
+}
+
+.progress-exercise-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.progress-exercise-pills .pill {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+/* ── Empty State ──────────────────────────────────────────────────────── */
+
+.progress-empty {
+  text-align: center;
+  padding: 40px 16px;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+/* ── PR Celebration Overlay ───────────────────────────────────────────── */
+
+.pr-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 2000;
+  animation: pr-overlay-in 0.25s ease forwards;
+}
+
+.pr-overlay--exit {
+  animation: pr-overlay-out 0.3s ease forwards;
+}
+
+@keyframes pr-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pr-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── Celebration Card ─────────────────────────────────────────────────── */
+
+.pr-card {
+  position: relative;
+  background: linear-gradient(145deg, #1c1505 0%, #0f172a 60%, #120d1e 100%);
+  border: 1px solid #713f12;
+  border-radius: 20px;
+  padding: 28px 24px 20px;
+  width: min(420px, 100%);
+  text-align: center;
+  display: grid;
+  gap: 16px;
+  animation: pr-card-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  z-index: 1;
+}
+
+.pr-card--exit {
+  animation: pr-card-out 0.3s ease forwards;
+}
+
+@keyframes pr-card-in {
+  from { transform: scale(0.75); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes pr-card-out {
+  from { transform: scale(1);    opacity: 1; }
+  to   { transform: scale(0.8);  opacity: 0; }
+}
+
+.pr-emoji {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.pr-title {
+  font-size: 22px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b, #d97706);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.pr-list {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.pr-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.pr-item-name {
+  font-weight: 700;
+  color: #fde68a;
+  font-size: 14px;
+}
+
+.pr-item-details {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.pr-item-weight {
+  font-size: 13px;
+  color: #e5e7eb;
+}
+
+.pr-item-delta {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+.pr-dismiss {
+  background: linear-gradient(90deg, #d97706, #b45309);
+  color: #fff8e1;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+}
+
+.pr-dismiss:hover {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+/* ── Sparks ───────────────────────────────────────────────────────────── */
+
+.pr-spark {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fbbf24;
+  pointer-events: none;
+  animation: spark-burst 0.8s ease-out both;
+  animation-delay: var(--spark-delay, 0s);
+}
+
+.pr-spark:nth-child(odd) {
+  background: #f97316;
+  width: 6px;
+  height: 6px;
+}
+
+.pr-spark:nth-child(3n) {
+  background: #22c55e;
+}
+
+@keyframes spark-burst {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--spark-angle, 0deg)) translateX(0);
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--spark-angle, 0deg)) translateX(120px);
+    opacity: 0;
+  }
+}
