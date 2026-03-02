@@ -8,8 +8,9 @@ import PlanPage from "./pages/PlanPage";
 import SetupPage from "./pages/SetupPage";
 import WeightPage from "./pages/WeightPage";
 import ProfilePage from "./pages/ProfilePage";
+import ProgressPage from "./pages/ProgressPage";
 
-type Tab = "plan" | "weight" | "profile";
+type Tab = "plan" | "weight" | "progress" | "profile";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("plan");
@@ -81,12 +82,15 @@ export default function App() {
         <div className={`tab ${tab === "weight" ? "active" : ""}`} onClick={() => setTab("weight")}>
           Weight
         </div>
+        <div className={`tab ${tab === "progress" ? "active" : ""}`} onClick={() => setTab("progress")}>
+          Progress
+        </div>
         <div className={`tab ${tab === "profile" ? "active" : ""}`} onClick={() => setTab("profile")}>
           Profile
         </div>
       </div>
 
-      {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : <ProfilePage />}
+      {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : <ProfilePage />}
       <div className="small muted" style={{ marginTop: 12 }}>
         Tip: On iPhone Safari → Share → Add to Home Screen.
       </div>
