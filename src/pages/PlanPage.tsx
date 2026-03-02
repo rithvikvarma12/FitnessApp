@@ -358,8 +358,20 @@ export default function PlanPage() {
                 <select
                   value={selected.nextWeekDays ?? ""}
                   onChange={async (e) => {
-                    const v = e.target.value === "" ? undefined : Number(e.target.value);
-                    await db.weekPlans.update(selected.id, { nextWeekDays: v });
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      const current = await db.weekPlans.get(selected.id);
+                      if (!current) return;
+                      const updated = { ...current };
+                      delete updated.nextWeekDays;
+                      await db.weekPlans.put(updated);
+                      return;
+                    }
+
+                    const v = Number(raw);
+                    if (v === 3 || v === 4 || v === 5) {
+                      await db.weekPlans.update(selected.id, { nextWeekDays: v });
+                    }
                   }}
                 >
                   <option value="">Auto (from notes)</option>

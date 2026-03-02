@@ -27,25 +27,42 @@ function normalizeName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
-function inferNextWeekDays(notes?: string, explicit?: number): number {
-  if (explicit && [3, 4, 5].includes(explicit)) return explicit;
+function inferNextWeekDays(notes?: string, explicit?: number | string | null): number {
+  const explicitNum =
+    typeof explicit === "number"
+      ? explicit
+      : typeof explicit === "string"
+        ? Number(explicit.trim())
+        : undefined;
+  if (explicitNum === 3 || explicitNum === 4 || explicitNum === 5) return explicitNum;
 
   const text = (notes ?? "").toLowerCase();
 
-  // 1) Prefer patterns that explicitly talk about next week
-  const nextWeekMatches = Array.from(
-    text.matchAll(/next\s*week[^0-9]{0,20}([345])\s*[- ]?\s*day(s)?/g)
-  );
-  if (nextWeekMatches.length > 0) {
-    const last = nextWeekMatches[nextWeekMatches.length - 1];
-    return Number(last[1]) as 3 | 4 | 5;
+  // Prefer patterns where "next week" appears near the number.
+  const priorityPatterns = [
+    /\b([345])\s*(?:x|days?)?\s*next\s*week\b/g, // "4 next week", "4x next week", "4 days next week"
+    /\bnext\s*week\s*(?:for\s*)?([345])\b/g, // "next week 3"
+    /\bfor\s+week\s+\d+\s+(?:do\s+)?([345])\b/g // "for week 7 do 4"
+  ];
+  for (const re of priorityPatterns) {
+    const matches = Array.from(text.matchAll(re));
+    if (matches.length > 0) {
+      const last = matches[matches.length - 1];
+      return Number(last[1]) as 3 | 4 | 5;
+    }
   }
 
-  // 2) Fallback: take the last generic match anywhere
-  const matches = Array.from(text.matchAll(/([345])\s*[- ]?\s*day(s)?/g));
-  if (matches.length > 0) {
-    const last = matches[matches.length - 1];
-    return Number(last[1]) as 3 | 4 | 5;
+  // Fallback: generic day-count mentions.
+  const fallbackPatterns = [
+    /\b([345])\s*days?\b/g, // "3 day", "3 days"
+    /\b([345])\s*x\b/g // "4x"
+  ];
+  for (const re of fallbackPatterns) {
+    const matches = Array.from(text.matchAll(re));
+    if (matches.length > 0) {
+      const last = matches[matches.length - 1];
+      return Number(last[1]) as 3 | 4 | 5;
+    }
   }
 
   return 5;
@@ -1166,10 +1183,9 @@ async function generateWeekFromTemplate(
   const goalMode: GoalMode = normalizeGoal(userProfile?.goalMode ?? userProfile?.goal);
   const exerciseCap = exerciseCapForGoal(goalMode);
 
-  const profileDefaultDays = userProfile?.daysPerWeek;
   const constraints = explicitTargetDays
     ? parseGenerationConstraints(undefined, explicitTargetDays)
-    : parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays ?? profileDefaultDays);
+    : parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays);
   const chosenBase: DayTemplate[] = remapDayTemplatesForTargetDays(plan, constraints.targetDays, exTemplates);
   const chosen: DayTemplate[] = applyGenerationConstraintsToDayTemplates(
     chosenBase,
