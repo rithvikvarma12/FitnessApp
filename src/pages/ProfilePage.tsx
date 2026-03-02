@@ -202,16 +202,20 @@ export default function ProfilePage() {
     }
   };
 
+  const fieldLabel = (text: string) => (
+    <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
+      {text}
+    </div>
+  );
+
   return (
     <div className="card">
       <h2>Profile Settings</h2>
-      <div className="small muted">Changes apply to future week generation only.</div>
-
-      <hr />
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 14 }}>Changes apply to future week generation only.</div>
 
       <div className="row">
         <div className="col">
-          <div className="small muted">Goal Mode</div>
+          {fieldLabel("Goal Mode")}
           <select
             value={form.goalMode}
             onChange={(e) => setForm((prev) => (prev ? { ...prev, goalMode: e.target.value as GoalMode } : prev))}
@@ -223,7 +227,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="col">
-          <div className="small muted">Target Weight ({unit})</div>
+          {fieldLabel(`Target Weight (${unit})`)}
           <input
             inputMode="decimal"
             value={form.targetWeight}
@@ -233,9 +237,9 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="row">
+      <div className="row" style={{ marginTop: 10 }}>
         <div className="col">
-          <div className="small muted">Days / week</div>
+          {fieldLabel("Days / week")}
           <select
             value={String(form.daysPerWeek)}
             onChange={(e) =>
@@ -249,7 +253,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="col">
-          <div className="small muted">Equipment</div>
+          {fieldLabel("Equipment")}
           <select
             value={form.equipment}
             onChange={(e) => setForm((prev) => (prev ? { ...prev, equipment: e.target.value as Equipment } : prev))}
@@ -261,30 +265,35 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="small muted">
-        Current weight (latest entry): {latestWeight ? `${toDisplay(latestWeight.weightKg, unit).toFixed(1)} ${unit}` : "No entries yet"}
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 10 }}>
+        Current weight: {latestWeight ? `${toDisplay(latestWeight.weightKg, unit).toFixed(1)} ${unit}` : "No entries yet"}
       </div>
 
-      <div className="row" style={{ marginTop: 12, alignItems: "center" }}>
+      <div className="row" style={{ marginTop: 14, alignItems: "center", gap: 10 }}>
         <button onClick={onSave} disabled={busy}>Save Profile</button>
-        {msg ? <div className="pill">{msg}</div> : null}
+        {msg ? <span style={{ fontSize: 12, color: "var(--accent-green)" }}>{msg}</span> : null}
       </div>
 
       <hr />
 
-      <div className="card" style={{ background: "#0b1220" }}>
-        <h3>Data</h3>
-        <div className="small muted">Local backup only (this device). Export/import JSON.</div>
-        <div className="row" style={{ marginTop: 10, alignItems: "center", gap: 8 }}>
+      <div style={{
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid var(--border-glass)",
+        borderRadius: "var(--radius-md)",
+        padding: "12px 14px"
+      }}>
+        <h3 style={{ marginBottom: 4 }}>Data</h3>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>Local backup only. Export/import JSON.</div>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
           <button type="button" className="secondary" onClick={() => void exportData()}>
-            Export Data
+            Export
           </button>
           <button
             type="button"
             className="secondary"
             onClick={() => importFileRef.current?.click()}
           >
-            Import Data
+            Import
           </button>
           <input
             ref={importFileRef}
@@ -293,7 +302,7 @@ export default function ProfilePage() {
             style={{ display: "none" }}
             onChange={(e) => void onImportPicked(e.target.files?.[0] ?? null)}
           />
-          {dataMsg ? <div className="pill">{dataMsg}</div> : null}
+          {dataMsg ? <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{dataMsg}</span> : null}
         </div>
       </div>
     </div>

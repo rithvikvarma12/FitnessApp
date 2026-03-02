@@ -223,6 +223,14 @@ function rampIncrementKg(unit: Unit): number {
   return roundToNearest(raw, 0.5);
 }
 
+function getDayAccentColor(title: string): string {
+  const lower = title.toLowerCase();
+  if (lower.includes("push")) return "#3b82f6";
+  if (lower.includes("pull")) return "#f97316";
+  if (lower.includes("leg")) return "#10b981";
+  return "#8b5cf6";
+}
+
 export default function WeekView({ week }: { week: WeekPlan }) {
   const [infoExerciseName, setInfoExerciseName] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
@@ -467,15 +475,30 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     setAlternativePicker(null);
   }
 
-  const completion = useMemo(() => {
-    const done = week.days.filter((d) => d.isComplete).length;
-    return `${done}/${week.days.length}`;
-  }, [week.days]);
+  const completedCount = week.days.filter((d) => d.isComplete).length;
+  const totalCount = week.days.length;
 
   return (
     <div className="list">
-      <div className="pill">
-        Week {week.weekNumber} • Start {week.startDateISO} • Days complete: {completion}
+      {/* Week info bar */}
+      <div className="week-info-bar">
+        <div>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Week {week.weekNumber}</span>
+          <span style={{ color: "var(--text-muted)", fontSize: 12, marginLeft: 8 }}>{week.startDateISO}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="week-progress-segs">
+            {week.days.map((d, i) => (
+              <div
+                key={i}
+                className={`week-progress-seg ${d.isComplete ? "filled" : ""}`}
+              />
+            ))}
+          </div>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>
+            {completedCount}/{totalCount}
+          </span>
+        </div>
       </div>
 
       {daysSorted.map((day) => (
@@ -561,44 +584,47 @@ function DayCard({
 }) {
   const dateLabel = format(parseISO(day.dateISO), "EEE, MMM d");
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const accentColor = getDayAccentColor(day.title);
 
   return (
-    <div className="card">
+    <div
+      className="dayCard"
+      style={{ borderLeftColor: accentColor }}
+    >
       <div className="dayCardHeader">
-        <button
-          type="button"
-          className="dayToggle"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Collapse day" : "Expand day"}
-        >
-          <span className="dayToggleChevron" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
-        </button>
-
         <div className="dayHeaderMain">
-          <h3>{day.title}</h3>
-          <div className="small muted">{dateLabel}</div>
+          <div className="dayTitle">{day.title}</div>
+          <div className="dayDate">{dateLabel}</div>
         </div>
 
-        <label className="pill" style={{ cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={day.isComplete}
-            onChange={(e) => onDayComplete(day.id, e.target.checked)}
+        <div className="dayCardActions">
+          <button
+            type="button"
+            className={`dayCompleteBtn ${day.isComplete ? "done" : ""}`}
+            onClick={() => onDayComplete(day.id, !day.isComplete)}
             disabled={isLocked}
-            style={{ marginRight: 8 }}
-          />
-          Complete
-        </label>
+          >
+            {day.isComplete ? "✓ Done" : "Mark Done"}
+          </button>
+          <button
+            type="button"
+            className="dayToggle"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse day" : "Expand day"}
+          >
+            <span className={`dayToggleChevron ${expanded ? "expanded" : ""}`} aria-hidden="true">▾</span>
+          </button>
+        </div>
       </div>
 
       {expanded && (
         <>
           <hr />
           {day.cardio ? (
-            <div className="card cardioBlockCard">
-              <div style={{ fontWeight: 700 }}>Cardio</div>
-              <div className="small">
+            <div className="cardioBlockCard">
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--accent-green)" }}>Cardio</div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
                 {day.cardio.modality} • {day.cardio.minutes} min
                 {day.cardio.intensity ? ` • ${day.cardio.intensity}` : ""}
               </div>
@@ -659,8 +685,9 @@ function ExerciseCard({
   const lastActualWeightKg = lastNonEmptyActualWeightKg(ex);
 
   return (
-    <div className="card workoutExerciseCard" style={{ background: "#0b1220" }}>
-      <div className="row exerciseHeaderRow" style={{ alignItems: "center" }}>
+    <div className="workoutExerciseCard">
+      {/* Exercise header */}
+      <div className="row exerciseHeaderRow" style={{ alignItems: "flex-start", gap: 10 }}>
         <div className="col">
           <button
             type="button"
@@ -670,31 +697,31 @@ function ExerciseCard({
           >
             {ex.name}
           </button>
-          <div className="small muted">
-            {ex.plannedSets} sets • reps {ex.repRange.min}-{ex.repRange.max}
+          <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            {ex.plannedSets} sets · {ex.repRange.min}–{ex.repRange.max} reps
           </div>
-          <div className="row exerciseActionRow" style={{ gap: 8, marginTop: 8 }}>
+          <div className="row exerciseActionRow" style={{ gap: 6, marginTop: 8 }}>
             <button
               className="secondary"
               disabled={isLocked}
               onClick={() => onExerciseAlternativesOpen(dayId, ex, dayExercises)}
-              style={{ padding: "6px 10px", fontSize: 12 }}
+              style={{ padding: "5px 9px", fontSize: 11 }}
             >
-              Alternatives
+              Swap
             </button>
             <button
               className="secondary"
               disabled={isLocked || typeof ex.plannedWeightKg !== "number"}
               onClick={() => onApplyBaseToAllSets(dayId, ex.id)}
-              style={{ padding: "6px 10px", fontSize: 12 }}
+              style={{ padding: "5px 9px", fontSize: 11 }}
             >
-              Apply base to all
+              Apply all
             </button>
             <button
               className="secondary"
               disabled={isLocked || typeof ex.plannedWeightKg !== "number"}
               onClick={() => onRampPlanFromBase(dayId, ex.id)}
-              style={{ padding: "6px 10px", fontSize: 12 }}
+              style={{ padding: "5px 9px", fontSize: 11 }}
             >
               Ramp
             </button>
@@ -702,9 +729,9 @@ function ExerciseCard({
               className="secondary"
               disabled={isLocked || typeof lastActualWeightKg !== "number"}
               onClick={() => onSetPlanToLastActual(dayId, ex.id)}
-              style={{ padding: "6px 10px", fontSize: 12 }}
+              style={{ padding: "5px 9px", fontSize: 11 }}
             >
-              Set plan = last actual
+              = Last actual
             </button>
           </div>
         </div>
@@ -713,7 +740,7 @@ function ExerciseCard({
           <input
             disabled={isLocked}
             inputMode="decimal"
-            placeholder={`Planned ${unit}`}
+            placeholder={`Base ${unit}`}
             value={typeof ex.plannedWeightKg === "number" ? toDisplay(ex.plannedWeightKg, unit) : ""}
             onChange={(e) => {
               const v = e.target.value.trim();
@@ -722,47 +749,42 @@ function ExerciseCard({
                 num === undefined || !Number.isFinite(num)
                   ? undefined
                   : fromDisplay(num, unit);
-
               onExerciseBasePlanUpdate(dayId, ex.id, kg);
             }}
           />
-          <div className="small muted">Base (optional)</div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.04em" }}>Base wt</div>
         </div>
       </div>
 
       <hr />
 
-      <div className="setRow setRowPlan setHeaderRow small muted" style={{ marginBottom: 6 }}>
-        <div>Set</div>
-        <div>Planned reps</div>
-        <div>Planned weight</div>
-        <div>Actual reps</div>
-        <div>Actual weight</div>
-        <div>Done</div>
+      {/* Set grid header */}
+      <div className="set-grid set-grid-header">
+        <div>#</div>
+        <div>{unit}</div>
+        <div>reps</div>
+        <div />
       </div>
 
-      <div className="list" style={{ gap: 8 }}>
-        {ex.sets.map((s) => (
-          <div key={s.setNumber} className="setRow setRowPlan setDataRow">
-            <div className="setField setFieldSet">
-              <div className="setFieldLabel">Set</div>
-              <div className="pill" style={{ justifyContent: "center" }}>{s.setNumber}</div>
-            </div>
+      {/* Set rows */}
+      <div style={{ display: "grid", gap: 4 }}>
+        {ex.sets.map((s) => {
+          const plannedWtPlaceholder =
+            typeof s.plannedWeightKg === "number"
+              ? String(toDisplay(s.plannedWeightKg, unit))
+              : typeof ex.plannedWeightKg === "number"
+              ? String(toDisplay(ex.plannedWeightKg, unit))
+              : unit;
+          return (
+            <div key={s.setNumber} className={`set-grid ${s.completed ? "set-row-done" : ""}`}>
+              <div className="set-num">{s.setNumber}</div>
 
-            <div className="setField">
-              <div className="setFieldLabel">Planned reps</div>
-              <div className="pill" style={{ justifyContent: "center" }}>
-                {s.plannedRepsMin}-{s.plannedRepsMax}
-              </div>
-            </div>
-
-            <div className="setField">
-              <div className="setFieldLabel">Planned weight</div>
               <input
                 disabled={isLocked}
                 inputMode="decimal"
-                placeholder={typeof ex.plannedWeightKg === "number" ? String(toDisplay(ex.plannedWeightKg, unit)) : ""}
-                value={typeof s.plannedWeightKg === "number" ? toDisplay(s.plannedWeightKg, unit) : ""}
+                placeholder={plannedWtPlaceholder}
+                value={typeof s.actualWeightKg === "number" ? toDisplay(s.actualWeightKg, unit) : ""}
+                className={s.completed ? "input-done" : ""}
                 onChange={(e) => {
                   const v = e.target.value.trim();
                   const num = v === "" ? undefined : Number(v);
@@ -770,19 +792,16 @@ function ExerciseCard({
                     num === undefined || !Number.isFinite(num)
                       ? undefined
                       : fromDisplay(num, unit);
-
-                  onSetUpdate(dayId, ex.id, s.setNumber, { plannedWeightKg: kg });
+                  onSetUpdate(dayId, ex.id, s.setNumber, { actualWeightKg: kg });
                 }}
               />
-            </div>
 
-            <div className="setField">
-              <div className="setFieldLabel">Actual reps</div>
               <input
                 disabled={isLocked}
                 inputMode="numeric"
-                placeholder={`${s.plannedRepsMin}-${s.plannedRepsMax}`}
+                placeholder={`${s.plannedRepsMin}–${s.plannedRepsMax}`}
                 value={s.actualReps ?? ""}
+                className={s.completed ? "input-done" : ""}
                 onChange={(e) => {
                   const v = e.target.value.trim();
                   const num = v === "" ? undefined : Number(v);
@@ -791,40 +810,19 @@ function ExerciseCard({
                   });
                 }}
               />
-            </div>
 
-            <div className="setField">
-              <div className="setFieldLabel">Actual weight</div>
-              <input
+              <button
+                type="button"
+                className={`set-check-btn ${s.completed ? "done" : ""}`}
                 disabled={isLocked}
-                inputMode="decimal"
-                placeholder={s.plannedWeightKg !== undefined ? String(toDisplay(s.plannedWeightKg, unit)) : ""}
-                value={typeof s.actualWeightKg === "number" ? toDisplay(s.actualWeightKg, unit) : ""}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  const num = v === "" ? undefined : Number(v);
-                  const kg =
-                    num === undefined || !Number.isFinite(num)
-                      ? undefined
-                      : fromDisplay(num, unit);
-
-                  onSetUpdate(dayId, ex.id, s.setNumber, { actualWeightKg: kg });
-                }}
-              />
+                onClick={() => onSetUpdate(dayId, ex.id, s.setNumber, { completed: !s.completed })}
+                aria-label={s.completed ? "Mark incomplete" : "Mark complete"}
+              >
+                {s.completed ? "✓" : ""}
+              </button>
             </div>
-
-            <div className="setField setFieldDone">
-              <div className="setFieldLabel">Done</div>
-              <input
-                disabled={isLocked}
-                type="checkbox"
-                checked={s.completed}
-                onChange={(e) => onSetUpdate(dayId, ex.id, s.setNumber, { completed: e.target.checked })}
-                style={{ width: 20, height: 20 }}
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -875,12 +873,12 @@ function ExerciseInfoModal({
       >
         <div className="exerciseInfoHeader">
           <div style={{ minWidth: 0 }}>
-            <div className="small muted">Exercise info</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Exercise info</div>
             <h3 id="exercise-info-title" style={{ marginBottom: 6 }}>{exerciseName}</h3>
-            <div className="row" style={{ gap: 8 }}>
-              <span className="pill">{resolvedType}</span>
-              {meta?.equipment ? <span className="pill">{meta.equipment}</span> : null}
-              {meta?.movementPattern ? <span className="pill">{meta.movementPattern}</span> : null}
+            <div className="row" style={{ gap: 6 }}>
+              <span className="tag tag--blue">{resolvedType}</span>
+              {meta?.equipment ? <span className="tag tag--purple">{meta.equipment}</span> : null}
+              {meta?.movementPattern ? <span className="tag" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-glass-hover)", color: "var(--text-secondary)" }}>{meta.movementPattern}</span> : null}
             </div>
           </div>
           <div className="row" style={{ gap: 8 }}>

@@ -46,12 +46,6 @@ export default function PlanPage() {
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const setUnitForActiveProfile = async (nextUnit: Unit) => {
-    await db.settings.put({ key: "unit", value: nextUnit });
-    if (activeUserId) {
-      await db.userProfiles.update(activeUserId, { unit: nextUnit });
-    }
-  };
 
   // v0.3.2 UI: end-week-early flow
   const [endEarlyMode, setEndEarlyMode] = useState(false);
@@ -131,6 +125,13 @@ export default function PlanPage() {
     const fourteenDay = recentWeightEntries.slice(-14).map((e) => ({ dateISO: e.dateISO, value: e.weightKg }));
     const trendKgPerWeek = weeklyTrendFromWindow(fourteenDay);
 
+    const remainingColor =
+      deltaKg === null
+        ? "var(--text-secondary)"
+        : deltaKg > 0
+          ? "var(--accent-orange)"
+          : "var(--accent-green)";
+
     return {
       latestLabel: typeof latestKg === "number" ? `${toDisplay(latestKg, unit).toFixed(1)} ${unit}` : "—",
       targetLabel: typeof targetKg === "number" ? `${toDisplay(targetKg, unit).toFixed(1)} ${unit}` : "—",
@@ -141,7 +142,8 @@ export default function PlanPage() {
       trendLabel:
         trendKgPerWeek === null
           ? "—"
-          : `${trendKgPerWeek >= 0 ? "+" : "-"}${Math.abs(toDisplay(trendKgPerWeek, unit)).toFixed(2)} ${unit}/week`
+          : `${trendKgPerWeek >= 0 ? "+" : "-"}${Math.abs(toDisplay(trendKgPerWeek, unit)).toFixed(2)} ${unit}/week`,
+      remainingColor
     };
   }, [recentWeightEntries, activeProfile, unit]);
   const generationContext = useMemo(() => {
@@ -179,107 +181,98 @@ export default function PlanPage() {
 
   return (
     <div className="card">
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <div className="col">
-          <h2>Weekly Plan</h2>
-          <div className="small muted">
-            Mark days complete to unlock normal generation. If you miss a day, end the week early.
-          </div>
-        </div>
-
-        <div className="row" style={{ alignItems: "center", gap: 16 }}>
-          {/* UNIT TOGGLE */}
-          <div className="pill" style={{ display: "flex", gap: 8 }}>
-            <button
-              className={unit === "kg" ? "" : "secondary"}
-              onClick={() => void setUnitForActiveProfile("kg")}
-            >
-              kg
-            </button>
-            <button
-              className={unit === "lb" ? "" : "secondary"}
-              onClick={() => void setUnitForActiveProfile("lb")}
-            >
-              lb
-            </button>
-          </div>
-
-          {/* WEEK SELECTOR */}
-          <div style={{ minWidth: 220 }}>
-            <select
-              value={selected?.id ?? ""}
-              onChange={(e) => {
-                setSelectedWeekId(e.target.value);
-                setEndEarlyMode(false);
-              }}
-              disabled={!weeks || weeks.length === 0}
-            >
-              {(weeks ?? [])
-                .slice()
-                .sort((a, b) => b.weekNumber - a.weekNumber)
-                .map(w => (
-                  <option key={w.id} value={w.id}>
-                    Week {w.weekNumber} {w.isLocked ? "(locked)" : ""}
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
+      {/* Header row: title + week selector */}
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <h2 style={{ margin: 0 }}>Weekly Plan</h2>
+        <select
+          value={selected?.id ?? ""}
+          onChange={(e) => {
+            setSelectedWeekId(e.target.value);
+            setEndEarlyMode(false);
+          }}
+          disabled={!weeks || weeks.length === 0}
+          style={{ width: "auto", minWidth: 120 }}
+        >
+          {(weeks ?? [])
+            .slice()
+            .sort((a, b) => b.weekNumber - a.weekNumber)
+            .map(w => (
+              <option key={w.id} value={w.id}>
+                Week {w.weekNumber} {w.isLocked ? "🔒" : ""}
+              </option>
+            ))}
+        </select>
       </div>
 
-      <hr />
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>
+        Mark days complete to unlock generation. Miss a day? End week early.
+      </div>
 
       <GoalReachedBanner userId={activeUserId} unit={unit} />
 
-      <div className="row" style={{ gap: 8, marginTop: 10, marginBottom: 10 }}>
-        <span className="pill">Latest: {progressSummary.latestLabel}</span>
-        <span className="pill">Target: {progressSummary.targetLabel}</span>
-        <span className="pill">Remaining: {progressSummary.deltaLabel}</span>
-        <span className="pill">Trend (14d): {progressSummary.trendLabel}</span>
+      {/* Weight stats row */}
+      <div className="stats-row">
+        <div className="stat-box">
+          <div className="stat-box-label">Latest</div>
+          <div className="stat-box-value">{progressSummary.latestLabel}</div>
+        </div>
+        <div className="stat-box">
+          <div className="stat-box-label">Target</div>
+          <div className="stat-box-value" style={{ color: "var(--text-secondary)" }}>{progressSummary.targetLabel}</div>
+        </div>
+        <div className="stat-box">
+          <div className="stat-box-label">Remaining</div>
+          <div className="stat-box-value" style={{ color: progressSummary.remainingColor }}>{progressSummary.deltaLabel}</div>
+        </div>
+        <div className="stat-box">
+          <div className="stat-box-label">Trend 14d</div>
+          <div className="stat-box-value" style={{ color: "var(--accent-green)" }}>{progressSummary.trendLabel}</div>
+        </div>
       </div>
 
       {selected && cardioSummary && (
         <>
-          <div className="card" style={{ background: "#0b1220" }}>
-            <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{
+            background: "rgba(16, 185, 129, 0.05)",
+            border: "1px solid rgba(16, 185, 129, 0.15)",
+            borderLeft: "2px solid var(--accent-green)",
+            borderRadius: "var(--radius-md)",
+            padding: "10px 12px",
+            marginBottom: 12
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div>
-                <h3>Cardio</h3>
-                <div className="small muted">
-                  Summary from this week's assigned cardio blocks.
-                </div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--accent-green)" }}>Cardio</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{cardioSummary.suggestedSchedule}</div>
               </div>
-              <div className="row" style={{ gap: 8 }}>
-                <span className="pill">{cardioSummary.modalityLabel}</span>
-                <span className="pill">
-                  {cardioSummary.sessionsPerWeek}x / week
-                </span>
-                <span className="pill">
-                  {cardioSummary.minuteLabel}
-                </span>
-                <span className="pill">
-                  {cardioSummary.intensityLabel}
-                </span>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <span className="tag tag--green">{cardioSummary.modalityLabel}</span>
+                <span className="tag tag--green">{cardioSummary.sessionsPerWeek}×/wk</span>
+                <span className="tag tag--green">{cardioSummary.minuteLabel}</span>
+                {cardioSummary.intensityLabel !== "-" && (
+                  <span className="tag tag--green">{cardioSummary.intensityLabel}</span>
+                )}
               </div>
-            </div>
-
-            <hr />
-
-            <div className="row" style={{ alignItems: "center", gap: 12 }}>
-              <div className="small muted">Suggested schedule</div>
-              <div style={{ fontWeight: 700 }}>{cardioSummary.suggestedSchedule}</div>
             </div>
           </div>
-          <hr />
         </>
       )}
 
       {/* QUICK START (ONLY IF NO WEEKS EXIST YET) */}
       {isEmpty && (
         <>
-          <div className="card" style={{ background: "#0b1220" }}>
-            <h3>Quick Start</h3>
-            <div className="small muted">If no plan exists yet, create Week 1 or initialize the Rithvik preset.</div>
-            <hr />
+          <div style={{
+            background: "rgba(59, 130, 246, 0.06)",
+            border: "1px solid rgba(59, 130, 246, 0.15)",
+            borderLeft: "2px solid var(--accent-blue)",
+            borderRadius: "var(--radius-md)",
+            padding: "12px 14px",
+            marginBottom: 12
+          }}>
+            <h3 style={{ color: "var(--accent-blue)", marginBottom: 4 }}>Quick Start</h3>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+              No plan yet. Create Week 1 or load the Rithvik preset.
+            </div>
             <div className="row" style={{ gap: 10 }}>
               <button
                 disabled={busy}
@@ -299,27 +292,25 @@ export default function PlanPage() {
               >
                 Create Week 1
               </button>
-            
-            <button
-              className="secondary"
-              disabled={busy}
-              onClick={async () => {
-                setErr(null);
-                setBusy(true);
-                try {
-                  await initRithvikPresetWeek6();
-                } catch (e: any) {
-                  setErr(e?.message ?? "Could not initialize preset.");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Initialize Rithvik Preset (Start Week 6)
-            </button>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={async () => {
+                  setErr(null);
+                  setBusy(true);
+                  try {
+                    await initRithvikPresetWeek6();
+                  } catch (e: any) {
+                    setErr(e?.message ?? "Could not initialize preset.");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Rithvik Preset (Week 6)
+              </button>
             </div>
           </div>
-          <hr />
         </>
       )}
 
@@ -328,24 +319,21 @@ export default function PlanPage() {
       {selected && !selected.isLocked && (
         <>
           <hr />
-          <div className="card" style={{ background: "#0b1220" }}>
-            <h3>End-of-week notes (used to generate next week)</h3>
+          <div style={{
+            background: "rgba(255,255,255,0.02)",
+            border: "1px solid var(--border-glass)",
+            borderRadius: "var(--radius-md)",
+            padding: "12px 14px"
+          }}>
+            <h3 style={{ marginBottom: 10 }}>End-of-week notes</h3>
 
             <div className="row">
               <div className="col">
-                <div className="small muted">Notes</div>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Notes (used to generate next week)</div>
                 <textarea
                   ref={notesRef}
-                  style={{
-                    width: "100%",
-                    minHeight: 90,
-                    padding: 10,
-                    borderRadius: 10,
-                    border: "1px solid #334155",
-                    background: "#0b1220",
-                    color: "#e5e7eb"
-                  }}
-                  placeholder='Examples: "Only can go 3 days next week", "Travel Tue-Thu", "Back sore—go lighter"'
+                  style={{ minHeight: 80 }}
+                  placeholder='"3 days next week", "Travel Tue–Thu", "Back sore—go lighter"'
                   value={selected.notes ?? ""}
                   onChange={async (e) => {
                     await db.weekPlans.update(selected.id, { notes: e.target.value });
@@ -353,8 +341,8 @@ export default function PlanPage() {
                 />
               </div>
 
-              <div style={{ width: 180 }}>
-                <div className="small muted">Next week days</div>
+              <div style={{ width: 160, flexShrink: 0 }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Next week days</div>
                 <select
                   value={selected.nextWeekDays ?? ""}
                   onChange={async (e) => {
@@ -367,7 +355,6 @@ export default function PlanPage() {
                       await db.weekPlans.put(updated);
                       return;
                     }
-
                     const v = Number(raw);
                     if (v === 3 || v === 4 || v === 5) {
                       await db.weekPlans.update(selected.id, { nextWeekDays: v });
@@ -379,21 +366,25 @@ export default function PlanPage() {
                   <option value="4">4 days</option>
                   <option value="5">5 days</option>
                 </select>
-
-                <div className="small muted" style={{ marginTop: 6 }}>
-                  If set, this overrides notes.
-                </div>
               </div>
             </div>
 
-            <div className="small muted" style={{ marginTop: 10 }}>
-              Current week completion: {completion.done}/{completion.total} (missed {completion.missed})
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+              Completion: {completion.done}/{completion.total} days {completion.missed > 0 ? `· missed ${completion.missed}` : ""}
             </div>
 
             {endEarlyMode && (
-              <div className="pill" style={{ marginTop: 12, borderColor: "#f59e0b" }}>
-                End week early mode: update your notes (and optionally set Next week days), then click Confirm.
-                <div className="row" style={{ marginTop: 10, gap: 10 }}>
+              <div style={{
+                marginTop: 12,
+                padding: "10px 12px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid rgba(234, 179, 8, 0.25)",
+                background: "rgba(234, 179, 8, 0.06)",
+                fontSize: 12,
+                color: "var(--text-secondary)"
+              }}>
+                Update notes then confirm to lock this week and generate next.
+                <div className="row" style={{ marginTop: 10, gap: 8 }}>
                   <button
                     disabled={busy}
                     onClick={async () => {
@@ -403,19 +394,12 @@ export default function PlanPage() {
                       try {
                         const missed = selected.days.filter(d => !d.isComplete).length;
                         const stamp = `Ended early: missed ${missed} workout(s).`;
-
                         const mergedNotes =
                           (selected.notes?.trim() ? `${selected.notes.trim()}\n` : "") + stamp;
-
-                        await db.weekPlans.update(selected.id, {
-                          notes: mergedNotes,
-                          isLocked: true
-                        });
-
+                        await db.weekPlans.update(selected.id, { notes: mergedNotes, isLocked: true });
                         await generateNextWeek();
                         const latest = await getLatestWeek();
                         if (latest) setSelectedWeekId(latest.id);
-
                         setEndEarlyMode(false);
                       } catch (e: any) {
                         setErr(e?.message ?? "Could not end week early.");
@@ -424,14 +408,9 @@ export default function PlanPage() {
                       }
                     }}
                   >
-                    Confirm End Week + Generate
+                    Confirm + Generate
                   </button>
-
-                  <button
-                    className="secondary"
-                    disabled={busy}
-                    onClick={() => setEndEarlyMode(false)}
-                  >
+                  <button className="secondary" disabled={busy} onClick={() => setEndEarlyMode(false)}>
                     Cancel
                   </button>
                 </div>
@@ -443,54 +422,51 @@ export default function PlanPage() {
 
       <hr />
 
-      <div className="row" style={{ alignItems: "center", gap: 12 }}>
-        <div className="small muted" style={{ width: "100%" }}>
-          Generating using: {generationContext.goalMode} • target {generationContext.targetLabel} • {generationContext.daysPerWeek} days/week • cardio {generationContext.cardioSessions}x/week, {generationContext.cardioMinutesLabel} min/session
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+          {generationContext.goalMode} · target {generationContext.targetLabel} · {generationContext.daysPerWeek} days/wk · cardio {generationContext.cardioSessions}×, {generationContext.cardioMinutesLabel} min
         </div>
 
-        {/* Normal generate: locked until all days complete */}
-        <button
-          disabled={busy || !selected || !!selected?.isLocked || !completion.allComplete}
-          onClick={async () => {
-            setErr(null);
-            setBusy(true);
-            try {
-              await generateNextWeek();
-              const latest = await getLatestWeek();
-              if (latest) setSelectedWeekId(latest.id);
-            } catch (e: any) {
-              setErr(e?.message ?? "Could not generate next week.");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Generate Next Week
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button
+            disabled={busy || !selected || !!selected?.isLocked || !completion.allComplete}
+            onClick={async () => {
+              setErr(null);
+              setBusy(true);
+              try {
+                await generateNextWeek();
+                const latest = await getLatestWeek();
+                if (latest) setSelectedWeekId(latest.id);
+              } catch (e: any) {
+                setErr(e?.message ?? "Could not generate next week.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Generate Next Week
+          </button>
 
-        {/* End early: always available if week exists and not locked */}
-        <button
-          className="secondary"
-          disabled={busy || !selected || !!selected?.isLocked}
-          onClick={() => {
-            setEndEarlyMode(true);
-            // focus notes so you can type immediately
-            setTimeout(() => notesRef.current?.focus(), 0);
-          }}
-        >
-          End Week Early + Generate
-        </button>
+          <button
+            className="secondary"
+            disabled={busy || !selected || !!selected?.isLocked}
+            onClick={() => {
+              setEndEarlyMode(true);
+              setTimeout(() => notesRef.current?.focus(), 0);
+            }}
+          >
+            End Week Early
+          </button>
+        </div>
 
         {!completion.allComplete && selected && !selected.isLocked && (
-          <div className="pill">
-            Finish all days OR use “End Week Early + Generate”
+          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            Finish all days or use "End Week Early" to generate next week.
           </div>
         )}
 
         {err && (
-          <div className="pill" style={{ borderColor: "#dc2626" }}>
-            {err}
-          </div>
+          <div className="tag tag--red" style={{ padding: "6px 10px", fontSize: 12 }}>{err}</div>
         )}
       </div>
     </div>

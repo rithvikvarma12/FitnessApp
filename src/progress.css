@@ -20,31 +20,43 @@
 }
 
 .progress-stat-card {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-left: 4px solid #3b82f6;
-  border-radius: 12px;
+  background: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: var(--radius-lg);
   padding: 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  transition: border-color 0.25s ease;
+}
+
+.progress-stat-card:hover {
+  border-color: var(--border-glass-hover);
+  border-left-color: inherit;
 }
 
 .progress-stat-emoji {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
 }
 
 .progress-stat-value {
-  font-size: 26px;
-  font-weight: 700;
-  color: #f3f4f6;
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
   line-height: 1.1;
 }
 
 .progress-stat-label {
   font-size: 11px;
-  color: #9ca3af;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   line-height: 1.3;
 }
 
@@ -53,18 +65,21 @@
 .progress-section-title {
   font-size: 14px;
   font-weight: 700;
-  color: #e5e7eb;
+  color: var(--text-primary);
   margin-bottom: 12px;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
 }
 
 /* ── Recent PRs Banner ────────────────────────────────────────────────── */
 
 .progress-prs-banner {
-  background: #1c1400;
-  border: 1px solid #713f12;
-  border-radius: 14px;
+  background: rgba(234, 179, 8, 0.06);
+  border: 1px solid rgba(234, 179, 8, 0.15);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: var(--radius-lg);
   padding: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .progress-prs-list {
@@ -81,37 +96,43 @@
 
 .progress-pr-name {
   font-weight: 600;
-  color: #fde68a;
+  color: var(--accent-gold);
   flex: 1 1 160px;
 }
 
 .progress-pr-weight {
+  font-family: var(--font-mono);
   font-size: 13px;
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .progress-pr-delta {
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
-  color: #22c55e;
+  color: var(--accent-green);
 }
 
 /* ── Weekly Volume Chart ──────────────────────────────────────────────── */
 
 .progress-chart-card {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
   padding: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* ── Muscle Group Breakdown ───────────────────────────────────────────── */
 
 .progress-muscle-card {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
   padding: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .progress-muscle-list {
@@ -133,14 +154,14 @@
 }
 
 .progress-muscle-stats {
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-weight: 400;
   font-size: 12px;
 }
 
 .progress-muscle-bar-track {
-  height: 8px;
-  background: #1f2937;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -156,6 +177,12 @@
 .progress-pr-board {
   display: grid;
   gap: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .progress-filter-row {
@@ -172,65 +199,82 @@
 }
 
 .progress-filter-pill {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid #374151;
-  background: #1f2937;
-  color: #9ca3af;
-  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-glass-hover);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: all 0.2s ease;
+}
+
+.progress-filter-pill:hover {
+  color: var(--text-secondary);
+  opacity: 1;
 }
 
 .progress-filter-pill--active {
-  border-color: #3b82f6;
-  background: #1e3a5f;
-  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue);
 }
 
 .progress-sort-select {
   width: auto;
-  padding: 6px 10px;
+  padding: 5px 10px;
   font-size: 12px;
   flex: 0 0 auto;
 }
 
 .progress-pr-board-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .progress-pr-board-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  background: #0b1220;
-  border: 1px solid #1f2937;
-  border-radius: 10px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
   flex-wrap: wrap;
+  transition: border-color 0.2s ease;
+}
+
+.progress-pr-board-row:hover {
+  border-color: var(--border-glass-hover);
 }
 
 .progress-pr-board-medal {
-  font-size: 16px;
+  font-size: 14px;
   width: 20px;
   flex-shrink: 0;
 }
 
 .progress-pr-board-name {
   font-weight: 600;
-  color: #e5e7eb;
+  color: var(--text-primary);
   flex: 1 1 160px;
+  font-size: 13px;
 }
 
 .progress-pr-board-weight {
+  font-family: var(--font-mono);
   font-size: 13px;
-  color: #93c5fd;
-  font-weight: 600;
+  color: var(--accent-blue);
+  font-weight: 500;
 }
 
 .progress-pr-board-meta {
   font-size: 11px;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -239,27 +283,38 @@
 .progress-top-exercises {
   display: grid;
   gap: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .progress-exercise-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 10px;
 }
 
 .progress-exercise-card {
-  background: #0b1220;
-  border: 1px solid #1f2937;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
   padding: 12px;
   display: grid;
   gap: 8px;
+  transition: border-color 0.2s ease;
+}
+
+.progress-exercise-card:hover {
+  border-color: var(--border-glass-hover);
 }
 
 .progress-exercise-name {
   font-weight: 700;
-  color: #e5e7eb;
-  font-size: 14px;
+  color: var(--text-primary);
+  font-size: 13px;
 }
 
 .progress-exercise-pills {
@@ -269,8 +324,9 @@
 }
 
 .progress-exercise-pills .pill {
+  font-family: var(--font-mono);
   font-size: 11px;
-  padding: 4px 8px;
+  padding: 3px 8px;
 }
 
 /* ── Empty State ──────────────────────────────────────────────────────── */
@@ -288,12 +344,14 @@
 .pr-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.85);
+  background: rgba(2, 6, 23, 0.88);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
   z-index: 2000;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   animation: pr-overlay-in 0.25s ease forwards;
 }
 
@@ -315,8 +373,8 @@
 
 .pr-card {
   position: relative;
-  background: linear-gradient(145deg, #1c1505 0%, #0f172a 60%, #120d1e 100%);
-  border: 1px solid #713f12;
+  background: rgba(13, 18, 32, 0.96);
+  border: 1px solid rgba(234, 179, 8, 0.3);
   border-radius: 20px;
   padding: 28px 24px 20px;
   width: min(420px, 100%);
@@ -325,6 +383,8 @@
   gap: 16px;
   animation: pr-card-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   z-index: 1;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .pr-card--exit {
@@ -353,6 +413,7 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  letter-spacing: -0.02em;
 }
 
 .pr-list {
@@ -362,9 +423,9 @@
 }
 
 .pr-item {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #374151;
-  border-radius: 10px;
+  background: rgba(234, 179, 8, 0.06);
+  border: 1px solid rgba(234, 179, 8, 0.15);
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   display: grid;
   gap: 4px;
@@ -372,7 +433,7 @@
 
 .pr-item-name {
   font-weight: 700;
-  color: #fde68a;
+  color: var(--accent-gold);
   font-size: 14px;
 }
 
@@ -383,30 +444,34 @@
 }
 
 .pr-item-weight {
+  font-family: var(--font-mono);
   font-size: 13px;
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .pr-item-delta {
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
-  color: #22c55e;
+  color: var(--accent-green);
 }
 
 .pr-dismiss {
   background: linear-gradient(90deg, #d97706, #b45309);
   color: #fff8e1;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 12px 32px;
+  font-family: var(--font-body);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   letter-spacing: 0.03em;
+  transition: opacity 0.15s ease;
 }
 
 .pr-dismiss:hover {
-  background: linear-gradient(90deg, #f59e0b, #d97706);
+  opacity: 0.9;
 }
 
 /* ── Sparks ───────────────────────────────────────────────────────────── */
@@ -418,20 +483,20 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #fbbf24;
+  background: var(--accent-gold);
   pointer-events: none;
   animation: spark-burst 0.8s ease-out both;
   animation-delay: var(--spark-delay, 0s);
 }
 
 .pr-spark:nth-child(odd) {
-  background: #f97316;
+  background: var(--accent-orange);
   width: 6px;
   height: 6px;
 }
 
 .pr-spark:nth-child(3n) {
-  background: #22c55e;
+  background: var(--accent-green);
 }
 
 @keyframes spark-burst {
@@ -439,9 +504,7 @@
     transform: translate(-50%, -50%) rotate(var(--spark-angle, 0deg)) translateX(0);
     opacity: 1;
   }
-  80% {
-    opacity: 0.8;
-  }
+  80% { opacity: 0.8; }
   100% {
     transform: translate(-50%, -50%) rotate(var(--spark-angle, 0deg)) translateX(120px);
     opacity: 0;

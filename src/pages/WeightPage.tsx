@@ -33,12 +33,7 @@ function normalizeDateISO(value: string) {
 
 export default function WeightPage() {
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
-  const setUnitForActiveProfile = async (nextUnit: Unit) => {
-    await db.settings.put({ key: "unit", value: nextUnit });
-    if (activeUserId) {
-      await db.userProfiles.update(activeUserId, { unit: nextUnit });
-    }
-  };
+
 
   const entries = useLiveQuery(
     async () => {
@@ -136,13 +131,13 @@ export default function WeightPage() {
 
   const options: any = {
     responsive: true,
-    plugins: { legend: { labels: { color: "#e5e7eb" } } },
+    plugins: { legend: { labels: { color: "#d8dee9" } } },
     scales: {
-      x: { ticks: { color: "#e5e7eb" }, grid: { color: "#1f2937" } },
+      x: { ticks: { color: "#d8dee9" }, grid: { color: "rgba(255,255,255,0.06)" } },
       y: {
-        ticks: { color: "#e5e7eb" },
-        grid: { color: "#1f2937" },
-        title: { display: true, text: `Weight (${unit})`, color: "#e5e7eb" }
+        ticks: { color: "#d8dee9" },
+        grid: { color: "rgba(255,255,255,0.06)" },
+        title: { display: true, text: `Weight (${unit})`, color: "#d8dee9" }
       }
     }
   };
@@ -199,96 +194,89 @@ export default function WeightPage() {
   return (
     <div className="card">
       <h2>Weight Tracker</h2>
-      <div className="small muted">Add your weight daily. Trend uses a 7-day average.</div>
-
-      <hr />
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 14 }}>
+        Log daily. Trend uses 7-day average.
+      </div>
 
       <GoalReachedBanner userId={activeUserId} unit={unit} />
 
-      <hr />
-
-      <div className="pill" style={{ marginBottom: 10 }}>
-        <button
-          className={unit === "kg" ? "" : "secondary"}
-          onClick={() => void setUnitForActiveProfile("kg")}
-          style={{ marginRight: 8 }}
-        >
-          kg
-        </button>
-
-        <button
-          className={unit === "lb" ? "" : "secondary"}
-          onClick={() => void setUnitForActiveProfile("lb")}
-        >
-          lb
-        </button>
-      </div>
-
-      <div className="row" style={{ alignItems: "end" }}>
-        <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-          <div className="small muted">Weight ({unit})</div>
+      {/* Log + goal row */}
+      <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+        <div style={{ flex: "1 1 160px" }}>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Weight ({unit})</div>
           <input
             inputMode="decimal"
             placeholder="e.g., 86.3"
             value={newWeight}
             onChange={(e) => setNewWeight(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleAddWeight(); }}
           />
         </div>
-
-        <div style={{ flex: "0 0 120px", minWidth: 120 }}>
-          <button onClick={handleAddWeight} style={{ width: "100%" }}>
-            Add
-          </button>
+        <div style={{ flex: "0 0 80px" }}>
+          <button onClick={handleAddWeight} style={{ width: "100%" }}>Log</button>
         </div>
-
-        <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-          <div className="small muted">Goal ({unit})</div>
+        <div style={{ flex: "1 1 160px" }}>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Goal ({unit})</div>
           <input
             inputMode="decimal"
-            placeholder="Set goal"
+            placeholder="Target weight"
             value={goalWeightInput}
             onChange={(e) => setGoalWeightInput(e.target.value)}
           />
         </div>
-
-        <div style={{ flex: "0 0 120px", minWidth: 120 }}>
-          <button className="secondary" onClick={handleSaveGoal} style={{ width: "100%" }}>
-            Save goal
-          </button>
+        <div style={{ flex: "0 0 80px" }}>
+          <button className="secondary" onClick={handleSaveGoal} style={{ width: "100%" }}>Save</button>
         </div>
       </div>
 
       <hr />
 
-      <div className="row" style={{ alignItems: "end", marginBottom: 10 }}>
-        <div style={{ width: 180, maxWidth: "100%" }}>
-          <div className="small muted">Range</div>
-          <select value={range} onChange={(e) => setRange(e.target.value as Range)}>
-            <option value="7">Last 7</option>
-            <option value="30">Last 30</option>
-            <option value="90">Last 90</option>
-            <option value="all">All</option>
-          </select>
-        </div>
+      {/* Range selector */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Range</span>
+        {(["7", "30", "90", "all"] as Range[]).map((r) => (
+          <button
+            key={r}
+            className={`unit-toggle-btn ${range === r ? "active" : ""}`}
+            onClick={() => setRange(r)}
+            style={{ fontSize: 11 }}
+          >
+            {r === "all" ? "All" : `${r}d`}
+          </button>
+        ))}
       </div>
 
-      <div className="card" style={{ background: "#0b1220" }}>
+      {/* Chart */}
+      <div style={{
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid var(--border-glass)",
+        borderRadius: "var(--radius-md)",
+        padding: 12,
+        marginBottom: 12
+      }}>
         {filtered.length >= 2 ? (
           <Line data={data} options={options} />
         ) : (
-          <div className="muted">Add at least 2 entries to see the chart.</div>
+          <div style={{ color: "var(--text-muted)", fontSize: 12, padding: "12px 0" }}>Add at least 2 entries to see the chart.</div>
         )}
       </div>
 
-      <hr />
-
-      <div className="list">
+      {/* Entry list */}
+      <div style={{ display: "grid", gap: 6 }}>
         {sortedEntries.slice().reverse().map((e) => (
-          <div key={e.id} className="row" style={{ alignItems: "center" }}>
-            <div className="pill">{e.dateISO}</div>
-            <div style={{ fontWeight: 700 }}>
+          <div key={e.id} style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 10px",
+            background: "rgba(255,255,255,0.02)",
+            border: "1px solid var(--border-glass)",
+            borderRadius: "var(--radius-md)"
+          }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>{e.dateISO}</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 700, flex: 1 }}>
               {formatWeight(e.weightKg, unit)} {unit}
-            </div>
+            </span>
             <button
               className="secondary"
               onClick={async () => {
@@ -296,7 +284,7 @@ export default function WeightPage() {
                 if (!confirmed) return;
                 await db.weightEntries.delete(e.id);
               }}
-              style={{ marginLeft: "auto" }}
+              style={{ padding: "4px 8px", fontSize: 11 }}
             >
               Delete
             </button>

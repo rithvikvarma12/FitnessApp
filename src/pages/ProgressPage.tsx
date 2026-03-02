@@ -32,10 +32,9 @@ interface StatCardProps {
   accentColor: string;
 }
 
-function StatCard({ emoji, value, label, accentColor }: StatCardProps) {
+function StatCard({ emoji: _emoji, value, label, accentColor }: StatCardProps) {
   return (
     <div className="progress-stat-card" style={{ borderLeftColor: accentColor }}>
-      <div className="progress-stat-emoji">{emoji}</div>
       <div className="progress-stat-value">{value}</div>
       <div className="progress-stat-label">{label}</div>
     </div>
@@ -51,8 +50,8 @@ function RecentPRsBanner({ prs, unit }: RecentPRsBannerProps) {
   if (prs.length === 0) return null;
   return (
     <div className="progress-prs-banner">
-      <div className="progress-section-title" style={{ color: "#eab308" }}>
-        🏆 This Week's PRs
+      <div className="progress-section-title" style={{ color: "var(--accent-gold)" }}>
+        This Week's PRs
       </div>
       <div className="progress-prs-list">
         {prs.slice(0, 5).map((pr) => {
@@ -106,17 +105,17 @@ function WeeklyVolumeChart({ summaries, unit }: WeeklyVolumeChartProps) {
   const options: any = {
     responsive: true,
     plugins: {
-      legend: { labels: { color: "#e5e7eb" } },
+      legend: { labels: { color: "#d8dee9" } },
     },
     scales: {
-      x: { ticks: { color: "#9ca3af" }, grid: { color: "#1f2937" } },
+      x: { ticks: { color: "#d8dee9" }, grid: { color: "rgba(255,255,255,0.06)" } },
       y: {
-        ticks: { color: "#9ca3af" },
-        grid: { color: "#1f2937" },
+        ticks: { color: "#d8dee9" },
+        grid: { color: "rgba(255,255,255,0.06)" },
         title: {
           display: true,
           text: `Volume (${unit})`,
-          color: "#9ca3af",
+          color: "#d8dee9",
         },
       },
     },
@@ -124,7 +123,7 @@ function WeeklyVolumeChart({ summaries, unit }: WeeklyVolumeChartProps) {
 
   return (
     <div className="progress-chart-card">
-      <div className="progress-section-title">📈 Weekly Volume Trend</div>
+      <div className="progress-section-title">Weekly Volume Trend</div>
       <Bar data={data} options={options} />
     </div>
   );
@@ -136,13 +135,13 @@ interface MuscleGroupBreakdownProps {
 }
 
 const GROUP_COLORS: Record<string, string> = {
-  Chest: "#3b82f6",
-  Back: "#a855f7",
-  Legs: "#22c55e",
+  Chest: "#ef4444",
+  Legs: "#10b981",
+  Back: "#3b82f6",
   Shoulders: "#f97316",
-  Biceps: "#ec4899",
-  Triceps: "#eab308",
-  Core: "#06b6d4",
+  Biceps: "#8b5cf6",
+  Triceps: "#ec4899",
+  Core: "#eab308",
   Other: "#6b7280",
 };
 
@@ -152,7 +151,7 @@ function MuscleGroupBreakdown({ groups, unit }: MuscleGroupBreakdownProps) {
 
   return (
     <div className="progress-muscle-card">
-      <div className="progress-section-title">💪 Muscle Group Breakdown</div>
+      <div className="progress-section-title">Muscle Group Breakdown</div>
       <div className="progress-muscle-list">
         {groups.map((g) => {
           const pct = (g.totalVolumeKg / maxVol) * 100;
@@ -161,7 +160,10 @@ function MuscleGroupBreakdown({ groups, unit }: MuscleGroupBreakdownProps) {
           return (
             <div key={g.group} className="progress-muscle-row">
               <div className="progress-muscle-label">
-                <span style={{ color }}>{g.group}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0, display: "inline-block" }} />
+                  <span style={{ color }}>{g.group}</span>
+                </span>
                 <span className="progress-muscle-stats">
                   {g.totalSets} sets · {vol} {unit}
                 </span>
@@ -228,7 +230,6 @@ export default function ProgressPage() {
     return (
       <div className="card">
         <div className="progress-empty">
-          <div style={{ fontSize: 48 }}>📊</div>
           <h2>No Data Yet</h2>
           <div className="muted">
             Complete some workouts to see your progress dashboard.
@@ -309,7 +310,7 @@ export default function ProgressPage() {
       {/* All-time PR board */}
       {sortedPRs.length > 0 && (
         <div className="progress-pr-board card">
-          <div className="progress-section-title">🏅 All-Time PR Board</div>
+          <div className="progress-section-title">All-Time PR Board</div>
 
           <div className="progress-filter-row">
             <div className="progress-filter-pills">
@@ -358,7 +359,7 @@ export default function ProgressPage() {
       {/* Top exercises by volume */}
       {topExercises.length > 0 && (
         <div className="progress-top-exercises card">
-          <div className="progress-section-title">📋 Top Exercises by Volume</div>
+          <div className="progress-section-title">Top Exercises by Volume</div>
           <div className="progress-exercise-grid">
             {topExercises.slice(0, 8).map((ex) => {
               const vol = Math.round(toDisplay(ex.totalVolumeKg, unit));

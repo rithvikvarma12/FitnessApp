@@ -189,25 +189,31 @@ export default function SetupPage() {
     }
   };
 
+  const fl = (text: string) => (
+    <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
+      {text}
+    </div>
+  );
+
   return (
     <div className="card">
       <h2>Setup Profile</h2>
-      <div className="small muted">Create your first profile to start using the app.</div>
-
-      <hr />
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 14 }}>
+        Create your first profile to get started.
+      </div>
 
       <div className="row">
         <div className="col">
-          <div className="small muted">Preset</div>
+          {fl("Preset")}
           <select value={preset} onChange={(e) => handlePresetChange(e.target.value as PresetKey)}>
-            <option value="generic">Generic gym preset</option>
+            <option value="generic">Generic gym</option>
             <option value="rithvik">Rithvik preset</option>
             <option value="demo">Demo (sample data)</option>
           </select>
         </div>
 
         <div className="col">
-          <div className="small muted">Profile name (optional)</div>
+          {fl("Profile name (optional)")}
           <input
             placeholder="e.g., Rithvik / Home Cut"
             value={form.name}
@@ -217,30 +223,30 @@ export default function SetupPage() {
       </div>
 
       {preset === "rithvik" && (
-        <div className="pill" style={{ marginTop: 10, width: "100%", display: "flex", gap: 10, alignItems: "center" }}>
+        <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}>
           <input
             type="checkbox"
             checked={startRithvikWeek6}
             onChange={(e) => setStartRithvikWeek6(e.target.checked)}
-            style={{ width: 18, height: 18 }}
+            style={{ width: 16, height: 16, flexShrink: 0 }}
           />
-          <span>Start at Week 6 using the Rithvik preset (current Monday start date)</span>
-        </div>
+          Start at Week 6 (Rithvik preset, current Monday)
+        </label>
       )}
 
       <hr />
 
       <div className="row">
-        <div style={{ flex: "1 1 140px", minWidth: 140 }}>
-          <div className="small muted">Unit</div>
+        <div style={{ flex: "1 1 120px" }}>
+          {fl("Unit")}
           <select value={form.unit} onChange={(e) => setField("unit", e.target.value as "kg" | "lb")}>
             <option value="kg">kg</option>
             <option value="lb">lb</option>
           </select>
         </div>
 
-        <div style={{ flex: "1 1 160px", minWidth: 160 }}>
-          <div className="small muted">Days / week</div>
+        <div style={{ flex: "1 1 120px" }}>
+          {fl("Days / week")}
           <select
             value={String(form.daysPerWeek)}
             onChange={(e) => setField("daysPerWeek", Number(e.target.value) as 3 | 4 | 5)}
@@ -251,8 +257,8 @@ export default function SetupPage() {
           </select>
         </div>
 
-        <div style={{ flex: "1 1 180px", minWidth: 180 }}>
-          <div className="small muted">Goal</div>
+        <div style={{ flex: "1 1 140px" }}>
+          {fl("Goal")}
           <select
             value={form.goalMode}
             onChange={(e) => setField("goalMode", e.target.value as FormState["goalMode"])}
@@ -264,9 +270,9 @@ export default function SetupPage() {
         </div>
       </div>
 
-      <div className="row">
+      <div className="row" style={{ marginTop: 10 }}>
         <div className="col">
-          <div className="small muted">Current Weight ({form.unit})</div>
+          {fl(`Current Weight (${form.unit})`)}
           <input
             inputMode="decimal"
             value={form.currentWeight}
@@ -275,7 +281,7 @@ export default function SetupPage() {
           />
         </div>
         <div className="col">
-          <div className="small muted">Target Weight ({form.unit})</div>
+          {fl(`Target Weight (${form.unit})`)}
           <input
             inputMode="decimal"
             value={form.targetWeight}
@@ -285,9 +291,9 @@ export default function SetupPage() {
         </div>
       </div>
 
-      <div className="row">
+      <div className="row" style={{ marginTop: 10 }}>
         <div className="col">
-          <div className="small muted">Experience</div>
+          {fl("Experience")}
           <select
             value={form.experience}
             onChange={(e) => setField("experience", e.target.value as FormState["experience"])}
@@ -298,7 +304,7 @@ export default function SetupPage() {
         </div>
 
         <div className="col">
-          <div className="small muted">Equipment</div>
+          {fl("Equipment")}
           <select
             value={form.equipment}
             onChange={(e) => setField("equipment", e.target.value as FormState["equipment"])}
@@ -312,16 +318,19 @@ export default function SetupPage() {
 
       <hr />
 
-      <div className="card" style={{ background: "#0b1220" }}>
-        <h3>Cardio Preferences</h3>
-        <div className="small muted">
-          Auto mode presets cardio from your goal and lifting days. You can switch to manual anytime.
+      <div style={{
+        background: "rgba(16, 185, 129, 0.04)",
+        border: "1px solid rgba(16, 185, 129, 0.12)",
+        borderLeft: "2px solid var(--accent-green)",
+        borderRadius: "var(--radius-md)",
+        padding: "12px 14px"
+      }}>
+        <h3 style={{ marginBottom: 4, color: "var(--accent-green)" }}>Cardio</h3>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>
+          Auto mode presets cardio from goal + lifting days.
         </div>
 
-        <div
-          className="pill"
-          style={{ marginTop: 10, width: "100%", display: "flex", gap: 10, alignItems: "center" }}
-        >
+        <label style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}>
           <input
             type="checkbox"
             checked={form.cardioGoalAuto}
@@ -340,14 +349,14 @@ export default function SetupPage() {
                 return next;
               });
             }}
-            style={{ width: 18, height: 18 }}
+            style={{ width: 16, height: 16, flexShrink: 0 }}
           />
-          <span>Auto-prescribe cardio from goal + days/week</span>
-        </div>
+          Auto-prescribe cardio
+        </label>
 
         <div className="row" style={{ marginTop: 10 }}>
-          <div style={{ flex: "1 1 180px", minWidth: 180 }}>
-            <div className="small muted">Cardio type</div>
+          <div style={{ flex: "1 1 140px" }}>
+            {fl("Cardio type")}
             <select
               value={form.cardioType}
               disabled={form.cardioGoalAuto}
@@ -359,8 +368,8 @@ export default function SetupPage() {
             </select>
           </div>
 
-          <div style={{ flex: "1 1 180px", minWidth: 180 }}>
-            <div className="small muted">Sessions / week</div>
+          <div style={{ flex: "1 1 120px" }}>
+            {fl("Sessions / wk")}
             <input
               type="number"
               min={0}
@@ -374,8 +383,8 @@ export default function SetupPage() {
             />
           </div>
 
-          <div style={{ flex: "1 1 180px", minWidth: 180 }}>
-            <div className="small muted">Minutes / session</div>
+          <div style={{ flex: "1 1 120px" }}>
+            {fl("Min / session")}
             <input
               type="number"
               min={0}
@@ -389,38 +398,24 @@ export default function SetupPage() {
             />
           </div>
         </div>
-
-        {form.cardioGoalAuto && (
-          <div className="small muted" style={{ marginTop: 8 }}>
-            Auto recommendation updates when goal or lifting days change.
-          </div>
-        )}
       </div>
 
-      <div className="small muted">Notes</div>
-      <textarea
-        value={form.notes}
-        onChange={(e) => setField("notes", e.target.value)}
-        placeholder="Optional context for this profile"
-        style={{
-          width: "100%",
-          minHeight: 90,
-          padding: 10,
-          borderRadius: 10,
-          border: "1px solid #334155",
-          background: "#0b1220",
-          color: "#e5e7eb"
-        }}
-      />
+      <div style={{ marginTop: 12 }}>
+        {fl("Notes (optional)")}
+        <textarea
+          value={form.notes}
+          onChange={(e) => setField("notes", e.target.value)}
+          placeholder="Optional context for this profile"
+          style={{ minHeight: 80 }}
+        />
+      </div>
 
-      <div className="row" style={{ alignItems: "center", marginTop: 12 }}>
+      <div className="row" style={{ alignItems: "center", marginTop: 14, gap: 10 }}>
         <button disabled={busy} onClick={createProfile}>
           Create Profile
         </button>
         {err && (
-          <div className="pill" style={{ borderColor: "#dc2626" }}>
-            {err}
-          </div>
+          <span className="tag tag--red" style={{ padding: "6px 10px" }}>{err}</span>
         )}
       </div>
     </div>
