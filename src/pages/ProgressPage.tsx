@@ -9,7 +9,6 @@ import type {
   PRComparison,
   WeeklySummary,
   MuscleGroupVolume,
-  ExerciseSummary,
 } from "../services/progressTracker";
 import PRCelebration from "../components/PRCelebration";
 import {
