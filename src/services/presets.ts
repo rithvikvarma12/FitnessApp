@@ -1,5 +1,5 @@
 import { db, getActiveUserId } from "../db/db";
-import { applyEquipmentToDayTemplates, remapDayTemplatesForTargetDays } from "./planGenerator";
+import { applyEquipmentToDayTemplates, remapDayTemplatesForTargetDays } from "./exerciseSelector";
 import type {
   DayTemplate,
   ExerciseTemplate,
