@@ -8,7 +8,8 @@ import type {
   ExerciseTemplate,
   UserProfile,
   ExerciseMeta,
-  ExerciseMetaType
+  ExerciseMetaType,
+  CustomExercise
 } from "./types";
 
 export type Setting = { key: string; value: string };
@@ -37,6 +38,7 @@ export class AppDB extends Dexie {
   planTemplates!: Table<PlanTemplate, string>;
   exerciseTemplates!: Table<ExerciseTemplate, string>;
   exerciseMeta!: Table<ExerciseMeta, string>;
+  customExercises!: Table<CustomExercise, string>;
   weekPlans!: Table<WeekPlan, string>;
   weightEntries!: Table<WeightEntry, string>;
   userProfiles!: Table<UserProfile, string>;
@@ -170,6 +172,18 @@ export class AppDB extends Dexie {
           }
         });
       });
+
+    // v7 (custom exercises per user)
+    this.version(7).stores({
+      planTemplates: "id, name",
+      exerciseTemplates: "id, name",
+      exerciseMeta: "exerciseTemplateId",
+      customExercises: "id, userId, name",
+      weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
+      weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
+      settings: "key",
+      userProfiles: "id, createdAtISO"
+    });
   }
 }
 

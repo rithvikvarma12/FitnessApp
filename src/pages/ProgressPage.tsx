@@ -79,9 +79,11 @@ function RecentPRsBanner({ prs, unit }: RecentPRsBannerProps) {
 interface WeeklyVolumeChartProps {
   summaries: WeeklySummary[];
   unit: Unit;
+  chartTextColor: string;
+  chartGridColor: string;
 }
 
-function WeeklyVolumeChart({ summaries, unit }: WeeklyVolumeChartProps) {
+function WeeklyVolumeChart({ summaries, unit, chartTextColor, chartGridColor }: WeeklyVolumeChartProps) {
   const chronological = [...summaries].reverse();
   const labels = chronological.map((s) => `Wk ${s.weekNumber}`);
   const volumes = chronological.map((s) =>
@@ -105,17 +107,17 @@ function WeeklyVolumeChart({ summaries, unit }: WeeklyVolumeChartProps) {
   const options: any = {
     responsive: true,
     plugins: {
-      legend: { labels: { color: "#d8dee9" } },
+      legend: { labels: { color: chartTextColor } },
     },
     scales: {
-      x: { ticks: { color: "#d8dee9" }, grid: { color: "rgba(255,255,255,0.06)" } },
+      x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
       y: {
-        ticks: { color: "#d8dee9" },
-        grid: { color: "rgba(255,255,255,0.06)" },
+        ticks: { color: chartTextColor },
+        grid: { color: chartGridColor },
         title: {
           display: true,
           text: `Volume (${unit})`,
-          color: "#d8dee9",
+          color: chartTextColor,
         },
       },
     },
@@ -216,6 +218,11 @@ export default function ProgressPage() {
     return (s?.value as Unit) ?? "kg";
   }, [], "kg" as Unit);
 
+  const theme = useLiveQuery(async () => {
+    const s = await db.settings.get("theme");
+    return (s?.value ?? "dark") as "dark" | "light";
+  }, [], "dark" as "dark" | "light");
+
   const snapshot = useMemo(
     () => (weeks && weeks.length > 0 ? computeProgressSnapshot(weeks) : null),
     [weeks]
@@ -301,7 +308,12 @@ export default function ProgressPage() {
 
       {/* Volume chart */}
       {weeklySummaries.length >= 2 && (
-        <WeeklyVolumeChart summaries={weeklySummaries} unit={unit} />
+        <WeeklyVolumeChart
+          summaries={weeklySummaries}
+          unit={unit}
+          chartTextColor={theme === "light" ? "#4a5568" : "#d8dee9"}
+          chartGridColor={theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)"}
+        />
       )}
 
       {/* Muscle group breakdown */}

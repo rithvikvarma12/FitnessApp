@@ -48,6 +48,10 @@ export default function WeightPage() {
     const s = await db.settings.get("unit");
     return (s?.value as Unit) ?? "kg";
   }, [], "kg" as Unit);
+  const theme = useLiveQuery(async () => {
+    const s = await db.settings.get("theme");
+    return (s?.value ?? "dark") as "dark" | "light";
+  }, [], "dark" as "dark" | "light");
   const activeProfile = useLiveQuery(
     async () => (activeUserId ? db.userProfiles.get(activeUserId) : undefined),
     [activeUserId]
@@ -129,15 +133,18 @@ export default function WeightPage() {
     ]
   };
 
+  const chartTextColor = theme === "light" ? "#4a5568" : "#d8dee9";
+  const chartGridColor = theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
+
   const options: any = {
     responsive: true,
-    plugins: { legend: { labels: { color: "#d8dee9" } } },
+    plugins: { legend: { labels: { color: chartTextColor } } },
     scales: {
-      x: { ticks: { color: "#d8dee9" }, grid: { color: "rgba(255,255,255,0.06)" } },
+      x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
       y: {
-        ticks: { color: "#d8dee9" },
-        grid: { color: "rgba(255,255,255,0.06)" },
-        title: { display: true, text: `Weight (${unit})`, color: "#d8dee9" }
+        ticks: { color: chartTextColor },
+        grid: { color: chartGridColor },
+        title: { display: true, text: `Weight (${unit})`, color: chartTextColor }
       }
     }
   };
@@ -248,7 +255,7 @@ export default function WeightPage() {
 
       {/* Chart */}
       <div style={{
-        background: "rgba(255,255,255,0.02)",
+        background: "var(--bg-subtle)",
         border: "1px solid var(--border-glass)",
         borderRadius: "var(--radius-md)",
         padding: 12,
@@ -269,7 +276,7 @@ export default function WeightPage() {
             alignItems: "center",
             gap: 10,
             padding: "8px 10px",
-            background: "rgba(255,255,255,0.02)",
+            background: "var(--bg-subtle)",
             border: "1px solid var(--border-glass)",
             borderRadius: "var(--radius-md)"
           }}>
