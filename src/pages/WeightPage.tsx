@@ -13,7 +13,8 @@ import {
   LinearScale,
   CategoryScale,
   Tooltip,
-  Legend
+  Legend,
+  type ChartOptions
 } from "chart.js";
 import { movingAverage } from "../services/stats";
 import GoalReachedBanner from "../components/GoalReachedBanner";
@@ -136,7 +137,7 @@ export default function WeightPage() {
   const chartTextColor = theme === "light" ? "#4a5568" : "#d8dee9";
   const chartGridColor = theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
 
-  const options: any = {
+  const options: ChartOptions<"line"> = {
     responsive: true,
     plugins: { legend: { labels: { color: chartTextColor } } },
     scales: {
