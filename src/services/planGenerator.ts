@@ -7,7 +7,8 @@ import type {
   WorkoutDay,
   ExerciseTemplate,
   PlanTemplate,
-  DayTemplate
+  DayTemplate,
+  CustomExercise
 } from "../db/types";
 
 const uid = () => crypto.randomUUID();
@@ -1149,7 +1150,17 @@ export async function createFirstWeekIfMissing(options?: { userId?: string; week
   const planTemplate = await db.planTemplates.toCollection().first();
   if (!planTemplate) throw new Error("No plan template found. Seed failed?");
 
-  const exercises = await db.exerciseTemplates.toArray();
+  const builtinExercises = await db.exerciseTemplates.toArray();
+  const customExercisesRaw: CustomExercise[] = await db.customExercises.where("userId").equals(activeUserId).toArray();
+  const exercises: ExerciseTemplate[] = [
+    ...builtinExercises,
+    ...customExercisesRaw.map((cx) => ({
+      id: cx.id,
+      name: cx.name,
+      defaultSets: cx.type === "compound" ? 4 : 3,
+      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 }
+    }))
+  ];
   const profile = await db.userProfiles.get(activeUserId);
   const explicitTargetDays = profile?.daysPerWeek ?? 5;
   const weekNumber = options?.weekNumber ?? 1;
@@ -1261,7 +1272,17 @@ export async function generateNextWeek() {
   const planTemplate = await db.planTemplates.toCollection().first();
   if (!planTemplate) throw new Error("No plan template found.");
 
-  const exTemplates = await db.exerciseTemplates.toArray();
+  const builtinTemplates = await db.exerciseTemplates.toArray();
+  const customExercisesRaw: CustomExercise[] = await db.customExercises.where("userId").equals(activeUserId).toArray();
+  const exTemplates: ExerciseTemplate[] = [
+    ...builtinTemplates,
+    ...customExercisesRaw.map((cx) => ({
+      id: cx.id,
+      name: cx.name,
+      defaultSets: cx.type === "compound" ? 4 : 3,
+      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 }
+    }))
+  ];
   const latest = await getLatestWeek(activeUserId);
 
   // Always lock previous week when moving forward

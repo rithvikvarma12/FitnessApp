@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
 import { fromDisplay, toDisplay } from "../services/units";
+import type { CustomExercise, ExerciseTemplate } from "../db/types";
 
 type GoalMode = "cut" | "maintain" | "bulk";
 type Equipment = "gym" | "home" | "minimal";
@@ -68,12 +69,25 @@ export default function ProfilePage() {
     const s = await db.settings.get("restTimerEnabled");
     return s?.value !== "false";
   }, [], true);
+  const theme = useLiveQuery(async () => {
+    const s = await db.settings.get("theme");
+    return (s?.value ?? "dark") as "dark" | "light";
+  }, [], "dark" as "dark" | "light");
+  const customExercises = useLiveQuery(
+    async () => activeUserId ? db.customExercises.where("userId").equals(activeUserId).toArray() : [],
+    [activeUserId], [] as CustomExercise[]
+  );
+  const allExerciseTemplates = useLiveQuery(
+    () => db.exerciseTemplates.toArray(), [], [] as ExerciseTemplate[]
+  );
 
   const [form, setForm] = useState<FormState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [dataMsg, setDataMsg] = useState<string | null>(null);
   const importFileRef = useRef<HTMLInputElement | null>(null);
+  const [customForm, setCustomForm] = useState({ name: "", muscleGroup: "chest", type: "isolation", equipment: "dumbbell", notes: "" });
+  const [customError, setCustomError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(initialForm);
@@ -207,6 +221,44 @@ export default function ProfilePage() {
     }
   };
 
+  const onAddCustomExercise = async () => {
+    if (!activeUserId) return;
+    setCustomError(null);
+    const trimmed = customForm.name.trim();
+    if (!trimmed) { setCustomError("Name is required."); return; }
+    const nameLower = trimmed.toLowerCase();
+    const dupInTemplates = (allExerciseTemplates ?? []).some((t) => t.name.toLowerCase() === nameLower);
+    const dupInCustom = (customExercises ?? []).some((c) => c.name.toLowerCase() === nameLower);
+    if (dupInTemplates || dupInCustom) { setCustomError("An exercise with that name already exists."); return; }
+    await db.customExercises.add({
+      id: crypto.randomUUID(),
+      userId: activeUserId,
+      name: trimmed,
+      muscleGroup: customForm.muscleGroup,
+      type: customForm.type,
+      equipment: customForm.equipment,
+      notes: customForm.notes.trim() || undefined,
+      createdAtISO: new Date().toISOString()
+    });
+    setCustomForm({ name: "", muscleGroup: "chest", type: "isolation", equipment: "dumbbell", notes: "" });
+  };
+
+  const onDeleteCustomExercise = async (id: string) => {
+    if (!window.confirm("Delete this custom exercise?")) return;
+    await db.customExercises.delete(id);
+  };
+
+  const GROUP_COLOR: Record<string, string> = {
+    chest: "rgba(239,68,68,0.15)", back: "rgba(59,130,246,0.15)", shoulders: "rgba(168,85,247,0.15)",
+    legs: "rgba(16,185,129,0.15)", biceps: "rgba(234,179,8,0.15)", triceps: "rgba(249,115,22,0.15)",
+    core: "rgba(20,184,166,0.15)", other: "rgba(148,163,184,0.15)"
+  };
+  const GROUP_TEXT: Record<string, string> = {
+    chest: "#ef4444", back: "#3b82f6", shoulders: "#a855f7",
+    legs: "#10b981", biceps: "#eab308", triceps: "#f97316",
+    core: "#14b8a6", other: "#94a3b8"
+  };
+
   const fieldLabel = (text: string) => (
     <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
       {text}
@@ -292,11 +344,33 @@ export default function ProfilePage() {
 
       <hr />
 
+      {/* Theme */}
+      <div style={{ marginBottom: 16 }}>
+        {fieldLabel("Theme")}
+        <div className="unit-toggle">
+          <button
+            className={`unit-toggle-btn ${theme === "dark" ? "active" : ""}`}
+            onClick={() => void db.settings.put({ key: "theme", value: "dark" })}
+          >
+            Dark
+          </button>
+          <button
+            className={`unit-toggle-btn ${theme === "light" ? "active" : ""}`}
+            onClick={() => void db.settings.put({ key: "theme", value: "light" })}
+          >
+            Light
+          </button>
+        </div>
+      </div>
+
+      <hr />
+
       <div style={{
-        background: "rgba(255,255,255,0.02)",
+        background: "var(--bg-subtle)",
         border: "1px solid var(--border-glass)",
         borderRadius: "var(--radius-md)",
-        padding: "12px 14px"
+        padding: "12px 14px",
+        marginBottom: 16
       }}>
         <h3 style={{ marginBottom: 4 }}>Data</h3>
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>Local backup only. Export/import JSON.</div>
@@ -320,6 +394,139 @@ export default function ProfilePage() {
           />
           {dataMsg ? <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{dataMsg}</span> : null}
         </div>
+      </div>
+
+      {/* Custom Exercises */}
+      <div style={{
+        background: "var(--bg-subtle)",
+        border: "1px solid var(--border-glass)",
+        borderRadius: "var(--radius-md)",
+        padding: "12px 14px"
+      }}>
+        <h3 style={{ marginBottom: 4 }}>Custom Exercises</h3>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>
+          Add exercises not in the built-in library. They'll appear in swap suggestions and future plans.
+        </div>
+
+        {/* Form */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+          <input
+            placeholder="Exercise name"
+            value={customForm.name}
+            onChange={(e) => setCustomForm((p) => ({ ...p, name: e.target.value }))}
+          />
+          <div className="row" style={{ gap: 8 }}>
+            <div className="col">
+              {fieldLabel("Muscle Group")}
+              <select
+                value={customForm.muscleGroup}
+                onChange={(e) => setCustomForm((p) => ({ ...p, muscleGroup: e.target.value }))}
+              >
+                <option value="chest">Chest</option>
+                <option value="back">Back</option>
+                <option value="shoulders">Shoulders</option>
+                <option value="legs">Legs</option>
+                <option value="biceps">Biceps</option>
+                <option value="triceps">Triceps</option>
+                <option value="core">Core</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="col">
+              {fieldLabel("Equipment")}
+              <select
+                value={customForm.equipment}
+                onChange={(e) => setCustomForm((p) => ({ ...p, equipment: e.target.value }))}
+              >
+                <option value="barbell">Barbell</option>
+                <option value="dumbbell">Dumbbell</option>
+                <option value="cable">Cable</option>
+                <option value="machine">Machine</option>
+                <option value="bodyweight">Bodyweight</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            {fieldLabel("Type")}
+            <div className="unit-toggle">
+              <button
+                className={`unit-toggle-btn ${customForm.type === "isolation" ? "active" : ""}`}
+                onClick={() => setCustomForm((p) => ({ ...p, type: "isolation" }))}
+              >
+                Isolation
+              </button>
+              <button
+                className={`unit-toggle-btn ${customForm.type === "compound" ? "active" : ""}`}
+                onClick={() => setCustomForm((p) => ({ ...p, type: "compound" }))}
+              >
+                Compound
+              </button>
+            </div>
+          </div>
+          <input
+            placeholder="Notes (optional)"
+            value={customForm.notes}
+            onChange={(e) => setCustomForm((p) => ({ ...p, notes: e.target.value }))}
+          />
+          {customError ? <div style={{ fontSize: 12, color: "#ef4444" }}>{customError}</div> : null}
+          <button type="button" onClick={() => void onAddCustomExercise()}>
+            Add Exercise
+          </button>
+        </div>
+
+        {/* List */}
+        {(customExercises ?? []).length === 0 ? (
+          <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "8px 0" }}>
+            No custom exercises added yet.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {(customExercises ?? []).map((cx) => (
+              <div
+                key={cx.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 10px",
+                  background: "var(--bg-input)",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border-subtle)"
+                }}
+              >
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{cx.name}</span>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+                  background: GROUP_COLOR[cx.muscleGroup] ?? GROUP_COLOR.other,
+                  color: GROUP_TEXT[cx.muscleGroup] ?? GROUP_TEXT.other
+                }}>
+                  {cx.muscleGroup}
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+                  background: "rgba(59,130,246,0.1)", color: "#3b82f6"
+                }}>
+                  {cx.type}
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+                  background: "var(--bg-subtle)", color: "var(--text-secondary)"
+                }}>
+                  {cx.equipment}
+                </span>
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ padding: "2px 8px", fontSize: 11 }}
+                  onClick={() => void onDeleteCustomExercise(cx.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

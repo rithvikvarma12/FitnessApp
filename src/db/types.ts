@@ -123,3 +123,14 @@ export type WeightEntry = {
   weightKg: number;
   createdAtISO: string;
 };
+
+export type CustomExercise = {
+  id: string;
+  userId: string;
+  name: string;
+  muscleGroup: string; // "chest"|"back"|"shoulders"|"legs"|"biceps"|"triceps"|"core"|"other"
+  type: string;        // "compound"|"isolation"
+  equipment: string;   // "barbell"|"dumbbell"|"cable"|"machine"|"bodyweight"|"other"
+  notes?: string;
+  createdAtISO: string;
+};

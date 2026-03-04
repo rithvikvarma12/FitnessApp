@@ -59,6 +59,14 @@ export default function App() {
     const s = await db.settings.get("unit");
     return (s?.value as Unit) ?? "kg";
   }, [], "kg" as Unit);
+  const theme = useLiveQuery(async () => {
+    const s = await db.settings.get("theme");
+    return (s?.value ?? "dark") as "dark" | "light";
+  }, [], "dark" as "dark" | "light");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     (async () => {
@@ -140,18 +148,27 @@ export default function App() {
             </select>
           </div>
 
-          <div className="unit-toggle">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="unit-toggle">
+              <button
+                className={`unit-toggle-btn ${unit === "kg" ? "active" : ""}`}
+                onClick={() => void setUnitForActiveProfile("kg")}
+              >
+                kg
+              </button>
+              <button
+                className={`unit-toggle-btn ${unit === "lb" ? "active" : ""}`}
+                onClick={() => void setUnitForActiveProfile("lb")}
+              >
+                lb
+              </button>
+            </div>
             <button
-              className={`unit-toggle-btn ${unit === "kg" ? "active" : ""}`}
-              onClick={() => void setUnitForActiveProfile("kg")}
+              className="theme-toggle-btn"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              onClick={() => void db.settings.put({ key: "theme", value: theme === "dark" ? "light" : "dark" })}
             >
-              kg
-            </button>
-            <button
-              className={`unit-toggle-btn ${unit === "lb" ? "active" : ""}`}
-              onClick={() => void setUnitForActiveProfile("lb")}
-            >
-              lb
+              {theme === "dark" ? "☀" : "🌙"}
             </button>
           </div>
         </div>

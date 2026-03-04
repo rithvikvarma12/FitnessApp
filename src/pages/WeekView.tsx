@@ -21,7 +21,9 @@ import type {
   SetEntry,
   ExerciseMeta,
   ExerciseTemplate,
-  ExerciseEquipment
+  ExerciseEquipment,
+  CustomExercise,
+  ExerciseMetaType
 } from "../db/types";
 import { findRecentPRs } from "../services/progressTracker";
 import type { PRComparison } from "../services/progressTracker";
@@ -235,6 +237,13 @@ function getDayAccentColor(title: string): string {
   return "#8b5cf6";
 }
 
+function customEquipToExerciseEquipment(eq: string): ExerciseEquipment {
+  if (eq === "barbell" || eq === "cable" || eq === "machine") return "gym";
+  if (eq === "dumbbell") return "home";
+  if (eq === "bodyweight") return "minimal";
+  return "either";
+}
+
 export default function WeekView({ week }: { week: WeekPlan }) {
   const [infoExerciseName, setInfoExerciseName] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
@@ -276,21 +285,44 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     () => week.days.slice().sort((a, b) => a.dateISO.localeCompare(b.dateISO)),
     [week.days]
   );
-  const exerciseTemplates = useLiveQuery(() => db.exerciseTemplates.toArray(), [], [] as ExerciseTemplate[]);
+  const rawBuiltinTemplates = useLiveQuery(() => db.exerciseTemplates.toArray(), [], [] as ExerciseTemplate[]);
   const exerciseMetaRows = useLiveQuery(() => db.exerciseMeta.toArray(), [], [] as ExerciseMeta[]);
   const restTimerEnabled = useLiveQuery(async () => {
     const s = await db.settings.get("restTimerEnabled");
     return s?.value !== "false";
   }, [], true);
+  const rawCustomExercises = useLiveQuery(
+    async () => activeUserId ? db.customExercises.where("userId").equals(activeUserId).toArray() : [],
+    [activeUserId], [] as CustomExercise[]
+  );
+
+  const exerciseTemplates = useMemo<ExerciseTemplate[]>(() => {
+    const customs: ExerciseTemplate[] = (rawCustomExercises ?? []).map((cx) => ({
+      id: cx.id,
+      name: cx.name,
+      defaultSets: cx.type === "compound" ? 4 : 3,
+      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 }
+    }));
+    return [...(rawBuiltinTemplates ?? []), ...customs];
+  }, [rawBuiltinTemplates, rawCustomExercises]);
 
   const exerciseTemplateIdByName = useMemo(
     () => new Map(exerciseTemplates.map((t) => [t.name, t.id])),
     [exerciseTemplates]
   );
-  const exerciseMetaByTemplateId = useMemo(
-    () => new Map(exerciseMetaRows.map((m) => [m.exerciseTemplateId, m])),
-    [exerciseMetaRows]
-  );
+  const exerciseMetaByTemplateId = useMemo(() => {
+    const map = new Map(exerciseMetaRows.map((m) => [m.exerciseTemplateId, m]));
+    for (const cx of rawCustomExercises ?? []) {
+      map.set(cx.id, {
+        exerciseTemplateId: cx.id,
+        primaryMuscles: [cx.muscleGroup],
+        movementPattern: cx.type === "compound" ? "push" : "isolation",
+        equipment: customEquipToExerciseEquipment(cx.equipment),
+        type: cx.type as ExerciseMetaType
+      });
+    }
+    return map;
+  }, [exerciseMetaRows, rawCustomExercises]);
 
   const selectedExerciseTemplateId = infoExerciseName ? exerciseTemplateIdByName.get(infoExerciseName) : undefined;
   const selectedExerciseMeta = selectedExerciseTemplateId
