@@ -153,6 +153,17 @@ h3 { font-size: 14px; font-weight: 700; }
 .small { font-size: 12px; }
 .muted { color: var(--text-secondary); }
 .mono { font-family: var(--font-mono); }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 .row { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -181,14 +192,25 @@ button {
 
 button:hover { opacity: 0.85; }
 
+button:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+.bottom-nav-item:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
 button.secondary {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--btn-secondary-bg);
   border: 1px solid var(--border-glass-hover);
   color: var(--text-secondary);
 }
 
 button.secondary:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--btn-secondary-bg-hover);
   color: var(--text-primary);
   opacity: 1;
 }
@@ -226,7 +248,7 @@ input:disabled, select:disabled, textarea:disabled {
 }
 
 select option {
-  background: #0d1220;
+  background: var(--select-option-bg);
   color: var(--text-primary);
 }
 
@@ -314,10 +336,10 @@ select option {
   display: flex;
   justify-content: space-around;
   padding: 6px 0 env(safe-area-inset-bottom, 14px);
-  background: rgba(8, 12, 22, 0.92);
+  background: var(--nav-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(60, 90, 160, 0.06);
+  border-top: 1px solid var(--nav-border);
   z-index: 100;
 }
 
@@ -785,7 +807,7 @@ select option {
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.8);
+  background: var(--overlay-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -799,7 +821,7 @@ select option {
   width: min(720px, 100%);
   max-height: min(88vh, 800px);
   overflow: auto;
-  background: rgba(10, 15, 28, 0.96);
+  background: var(--modal-bg);
   border: 1px solid var(--border-glass-hover);
   border-radius: var(--radius-lg);
   padding: 14px;
@@ -991,9 +1013,100 @@ select option {
     height: 22px !important;
   }
 
-  .stats-row { flex-wrap: nowrap; }
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
 
   .stat-box-value { font-size: 12px; }
+
+  /* Set grid touch targets */
+  .set-grid input {
+    min-height: 44px;
+  }
+
+  /* Session summary scrollable */
+  .session-summary-card {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* PR board name truncation */
+  .progress-pr-board-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  /* Swap modal scrollable */
+  .exerciseInfoModal {
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+}
+
+/* ── Day Card Collapse ──────────────────────────────────────────────────── */
+.dayCardBody {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
+}
+
+.dayCardBody--open {
+  grid-template-rows: 1fr;
+}
+
+.dayCardBodyInner {
+  overflow: hidden;
+}
+
+/* ── Tab Content Fade ───────────────────────────────────────────────────── */
+.tab-content {
+  animation: tab-fade-in 0.18s ease both;
+}
+
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Theme Transition ───────────────────────────────────────────────────── */
+body,
+.card,
+.bottom-nav,
+.modalCard,
+.dayCard {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* ── Empty States ───────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 40px 16px;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.empty-state-icon {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.empty-state-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.empty-state-body {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 280px;
+  line-height: 1.5;
 }
 
 /* ── Rest Timer ──────────────────────────────────────────────────────────── */

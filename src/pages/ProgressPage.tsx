@@ -237,11 +237,10 @@ export default function ProgressPage() {
   if (!snapshot) {
     return (
       <div className="card">
-        <div className="progress-empty">
-          <h2>No Data Yet</h2>
-          <div className="muted">
-            Complete some workouts to see your progress dashboard.
-          </div>
+        <div className="empty-state">
+          <div className="empty-state-icon">📊</div>
+          <div className="empty-state-title">No data yet</div>
+          <div className="empty-state-body">Complete some workouts to see your progress dashboard.</div>
         </div>
       </div>
     );

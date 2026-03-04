@@ -70,6 +70,19 @@ export type ProgressSnapshot = {
   topExercises: ExerciseSummary[];
 };
 
+// ─── PR Threshold Helpers ─────────────────────────────────────────────────────
+
+const COMPOUND_KEYWORDS_PR = [
+  "bench", "press", "row", "pulldown", "pull-up", "pull up",
+  "chin-up", "chin up", "squat", "deadlift", "rdl", "lunge",
+  "leg press", "carry", "push-up", "push up",
+];
+
+function isCompoundForPR(name: string): boolean {
+  const lower = name.toLowerCase();
+  return COMPOUND_KEYWORDS_PR.some((k) => lower.includes(k));
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function computeE1RM(weight: number, reps: number): number {
@@ -206,7 +219,8 @@ export function computeAllTimePRs(weeks: WeekPlan[]): Map<string, PRRecord> {
 
 export function findRecentPRs(
   weeks: WeekPlan[],
-  targetWeekNumber?: number
+  targetWeekNumber?: number,
+  options?: { applyThreshold?: boolean }
 ): PRComparison[] {
   if (weeks.length === 0) return [];
 
@@ -268,9 +282,19 @@ export function findRecentPRs(
     }
   }
 
+  // Apply threshold filter (first-time PRs always pass)
+  const { applyThreshold = false } = options ?? {};
+  const thresholded = applyThreshold
+    ? comparisons.filter((c) => {
+        if (c.prevWeightKg === 0) return true;
+        const minDelta = isCompoundForPR(c.exerciseName) ? 2.5 : 1.0;
+        return c.deltaKg >= minDelta;
+      })
+    : comparisons;
+
   // Dedupe by exercise name, keep highest e1rm delta
   const deduped = new Map<string, PRComparison>();
-  for (const c of comparisons) {
+  for (const c of thresholded) {
     const existing = deduped.get(c.exerciseName);
     if (!existing || c.deltaKg > existing.deltaKg) {
       deduped.set(c.exerciseName, c);
@@ -459,7 +483,7 @@ export function computeProgressSnapshot(weeks: WeekPlan[]): ProgressSnapshot {
   const last8 = sorted.slice(-8);
 
   const allTimePRs = computeAllTimePRs(sorted);
-  const recentPRs = findRecentPRs(sorted);
+  const recentPRs = findRecentPRs(sorted, undefined, { applyThreshold: true });
   const weeklySummaries = last8.map((w) => computeWeeklySummary(w, sorted));
   const streak = computeStreak(sorted);
   const muscleGroupVolumes = computeMuscleGroupVolumes(sorted, 4);

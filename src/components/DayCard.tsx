@@ -105,8 +105,8 @@ export default function DayCard({
         </div>
       </div>
 
-      {expanded && (
-        <>
+      <div className={`dayCardBody ${expanded ? "dayCardBody--open" : ""}`}>
+        <div className="dayCardBodyInner">
           <hr />
           {day.cardio ? (
             <div className="cardioBlockCard">
@@ -140,8 +140,8 @@ export default function DayCard({
               />
             ))}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

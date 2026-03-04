@@ -1,217 +1,88 @@
 CutGym – Intelligent Training Planner (PWA)
 
-A Progressive Web App (PWA) built with React + TypeScript + Vite + Dexie (IndexedDB) that intelligently generates weekly training plans, tracks weight progress, adapts based on performance, and links physique goals (cut/maintain/bulk) with cardio and lifting volume.
-
-🚀 Current Version
-
-v0.5.0 – Goal-Synced Training System
-
-🧠 Core Features
-1️⃣ Dynamic Weekly Plan Generation
-
-Generates 3/4/5 day plans
-
-Adjusts automatically based on:
-
-Profile goal (cut / maintain / bulk)
-
-Equipment (gym / home / minimal)
-
-Notes (e.g., “3 days next week”)
-
-Progression logic based on:
-
-Completed sets
-
-Reps achieved
-
-Estimated 1RM (compounds)
-
-2️⃣ Goal Modes (Cut / Maintain / Bulk)
-
-Each mode adjusts:
-
-Cut
-
-Slightly reduced accessory volume
-
-Higher prescribed cardio (4 sessions/week default)
-
-Moderate intensity
-
-Maintain
-
-Balanced lifting volume
-
-Moderate cardio (3 sessions/week)
-
-Bulk
-
-Increased lifting volume
-
-Lower cardio (2 sessions/week)
-
-Goal can be changed anytime in Profile.
-Previous weeks remain unchanged.
-
-3️⃣ Cardio System (Prescribed Days Only)
-
-Cardio automatically assigned to selected lifting days
-
-Modalities: Treadmill / Stairmaster / Bike / Row
-
-Sessions per week derived from goal
-
-Top summary card reflects actual assigned sessions (source-of-truth = week data)
-
-4️⃣ Weight Tracking
-
-Add weight entries
-
-Unit toggle (kg / lb)
-
-Goal line shown on chart
-
-14-day trend calculation
-
-Progress-to-goal displayed on Plan page
-
-5️⃣ Goal-Reached Banner
-
-When goal is reached:
-
-🎉 Switch to Maintain
-
-📈 Switch to Bulk
-
-🔁 Continue phase (set new goal)
-
-No forced transitions.
-
-6️⃣ Exercise History
-
-For each exercise:
-
-Compounds
-
-Best Weight chart
-
-Estimated 1RM chart (toggle)
-
-Isolations
-
-Best Weight chart
-
-Filters:
-
-Only completed sets
-
-Rep range filter for 1RM (3–10)
-
-7️⃣ Alternatives System
-
-Suggests equipment-compatible swaps
-
-Prevents duplicate exercises in a day
-
-Handles no-alternative scenarios safely
-
-8️⃣ Exercise Info Cards
-
-Primary muscles
-
-Coaching cues
-
-Optional video links
-
-Designed to expand later
-
-9️⃣ Data Backup
-
-Export JSON
-
-Import JSON (overwrite with confirmation)
-
-Fully local storage (IndexedDB)
-
-🏗 Architecture
-
-Frontend: React + TypeScript
-
-Bundler: Vite
-
-Storage: Dexie (IndexedDB)
-
-Charts: (whatever chart lib you’re using)
-
-PWA enabled
-
-No backend. Fully offline capable.
-
-📦 Installation
+A Progressive Web App built with React + TypeScript + Vite + Dexie (IndexedDB) that generates weekly training plans, tracks body weight, and adapts to performance over time.
+
+## Current Version
+
+v0.7.0 – Progress Dashboard, Custom Exercises & Theme System
+
+## Features
+
+### Training Plans
+- Generates 3/4/5 day weekly plans based on goal, equipment, and notes
+- Auto-progression: weight and rep targets advance week over week using e1RM
+- End Week Early flow with freeform notes to guide next week's generation
+- Exercise swap system with equipment-compatible alternatives
+
+### Goal Modes
+- **Cut** – reduced accessory volume, higher cardio frequency
+- **Maintain** – balanced volume and moderate cardio
+- **Bulk** – increased volume, lower cardio
+
+### Cardio System
+- Cardio sessions auto-assigned per goal mode
+- Modalities: Treadmill, Stairmaster, Bike, Row
+- Integrated into the weekly plan view
+
+### Weight Tracking
+- Daily weigh-in log with moving 7-day average trend
+- Goal weight line on chart
+- Goal-reached banner with transition options (Maintain / Bulk / New Goal)
+
+### Progress Dashboard
+- Current and longest workout streaks, overall completion rate
+- Weekly volume trend chart (last 8 weeks)
+- Muscle group breakdown with volume bars
+- All-Time PR Board with compound/isolation filter and sort
+- Top exercises by volume
+- Session summary modal on day completion
+- PR celebration overlay for noteworthy PRs (≥2.5 kg compounds, ≥1.0 kg isolations)
+
+### Exercise System
+- Exercise history charts (best weight + estimated 1RM for compounds)
+- Exercise info cards with muscles, cues, and video links
+- Custom exercise creation per user (name, muscle group, type, equipment)
+- Custom exercises appear in swap suggestions and plan generation
+
+### Theme & UX
+- Light and dark mode toggle
+- Smooth tab transitions and day card collapse animations
+- Rest timer with configurable duration
+- Workout duration tracking
+
+### Data
+- Full JSON export/import for backup and migration
+- Fully local — no backend, no account required
+
+## Architecture
+
+- **Frontend**: React + TypeScript
+- **Bundler**: Vite
+- **Storage**: Dexie (IndexedDB)
+- **Charts**: Chart.js via react-chartjs-2
+- **PWA**: Service worker, installable
+
+## Installation
+
+```bash
 npm install
 npm run dev
+```
 
-Production build:
+```bash
+npm run build   # production build
+```
 
-npm run build
-🗂 Version History
-v0.3
+## Version History
 
-Dynamic week generation
+| Version | Highlights |
+|---|---|
+| v0.7 | Progress dashboard, PR tracking, rest timer, workout duration, session summary, custom exercises, light/dark theme, code refactor |
+| v0.5 | Goal↔weight sync, goal-reached banner, exercise history charts, data export/import |
+| v0.4 | Profile system, equipment logic, cardio, exercise meta |
+| v0.3 | Dynamic week generation, notes-based adjustment, unit toggle, weight tracker |
 
-Notes-based week adjustment
+## Notes
 
-Unit toggle
-
-Weight tracker
-
-v0.4
-
-Profile system
-
-Equipment logic
-
-Cardio introduction
-
-Exercise meta system
-
-History modal foundation
-
-v0.5
-
-Goal ↔ weight sync
-
-Goal switching after onboarding
-
-Goal reached banner
-
-Prescribed cardio integration
-
-Exercise history charts (weight + e1RM)
-
-Data export/import
-
-Progress header on plan page
-
-UI polish & stability fixes
-
-🎯 Design Philosophy
-
-Plan adapts to life (missed days, illness, schedule changes)
-
-Goal-driven, not random templates
-
-History informs progression
-
-Simple enough for daily use
-
-Structured enough to scale later
-
-⚠️ Notes
-
-All data is local to device unless exported.
-
-Deleting IndexedDB clears data.
-
-Always export before major version changes.
+- All data is stored locally in IndexedDB — export before clearing browser data.
+- Deleting the IndexedDB will erase all data.

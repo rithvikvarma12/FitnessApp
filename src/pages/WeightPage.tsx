@@ -254,20 +254,31 @@ export default function WeightPage() {
         ))}
       </div>
 
+      {/* Empty state */}
+      {sortedEntries.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">⚖️</div>
+          <div className="empty-state-title">No weigh-ins yet</div>
+          <div className="empty-state-body">Log your first weight above to start tracking your progress.</div>
+        </div>
+      )}
+
       {/* Chart */}
-      <div style={{
-        background: "var(--bg-subtle)",
-        border: "1px solid var(--border-glass)",
-        borderRadius: "var(--radius-md)",
-        padding: 12,
-        marginBottom: 12
-      }}>
-        {filtered.length >= 2 ? (
-          <Line data={data} options={options} />
-        ) : (
-          <div style={{ color: "var(--text-muted)", fontSize: 12, padding: "12px 0" }}>Add at least 2 entries to see the chart.</div>
-        )}
-      </div>
+      {sortedEntries.length > 0 && (
+        <div style={{
+          background: "var(--bg-subtle)",
+          border: "1px solid var(--border-glass)",
+          borderRadius: "var(--radius-md)",
+          padding: 12,
+          marginBottom: 12
+        }}>
+          {filtered.length >= 2 ? (
+            <Line data={data} options={options} />
+          ) : (
+            <div style={{ color: "var(--text-muted)", fontSize: 12, padding: "12px 0" }}>Add at least 2 entries to see the chart.</div>
+          )}
+        </div>
+      )}
 
       {/* Entry list */}
       <div style={{ display: "grid", gap: 6 }}>

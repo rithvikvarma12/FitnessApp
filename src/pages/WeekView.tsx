@@ -183,6 +183,10 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     const s = await db.settings.get("unit");
     return (s?.value as Unit) ?? "kg";
   }, [], "kg" as Unit);
+  const theme = useLiveQuery(async () => {
+    const s = await db.settings.get("theme");
+    return (s?.value ?? "dark") as "dark" | "light";
+  }, [], "dark" as "dark" | "light");
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const userEquipment = useLiveQuery(async () => {
     if (!activeUserId) return "gym" as UserEquipment;
@@ -311,7 +315,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
 
   function requestDayComplete(dayId: string, val: boolean) {
     if (val) {
-      const prs = findRecentPRs(allUserWeeks ?? [], week.weekNumber);
+      const prs = findRecentPRs(allUserWeeks ?? [], week.weekNumber, { applyThreshold: true });
       setPendingPRs(prs);
       setSessionSummaryDayId(dayId);
     } else {
@@ -582,6 +586,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
         meta={selectedHistoryMeta}
         weeks={allUserWeeks}
         unit={unit}
+        theme={theme}
         onClose={() => setHistoryExerciseName(null)}
       />
       <ExerciseAlternativesModal
