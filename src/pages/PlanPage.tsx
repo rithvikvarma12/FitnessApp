@@ -17,12 +17,11 @@ export default function PlanPage() {
 
   const weeks = useLiveQuery(
     async () => {
-      if (!activeUserId) return [];
+      if (!activeUserId) return [] as WeekPlan[];
       const rows = await db.weekPlans.where("userId").equals(activeUserId).toArray();
       return rows.sort((a, b) => b.weekNumber - a.weekNumber);
     },
-    [activeUserId],
-    [] as WeekPlan[]
+    [activeUserId]
   );
 
   const unit = useLiveQuery(async () => {
@@ -179,6 +178,16 @@ export default function PlanPage() {
     };
   }, [activeProfile, selected, unit]);
 
+  if (weeks === undefined) {
+    return (
+      <div className="card">
+        <div className="empty-state">
+          <div className="empty-state-body">Loading…</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       {/* Header row: title + week selector */}
@@ -271,7 +280,7 @@ export default function PlanPage() {
           }}>
             <h3 style={{ color: "var(--accent-blue)", marginBottom: 4 }}>Quick Start</h3>
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
-              No plan yet. Create Week 1 or load the Rithvik preset.
+              No plan yet. Set up your profile and generate your first week.
             </div>
             <div className="row" style={{ gap: 10 }}>
               <button
@@ -290,7 +299,7 @@ export default function PlanPage() {
                   }
                 }}
               >
-                Create Week 1
+                {busy ? "Creating…" : "Create Week 1"}
               </button>
               <button
                 className="secondary"
@@ -444,7 +453,7 @@ export default function PlanPage() {
               }
             }}
           >
-            Generate Next Week
+            {busy ? "Generating…" : "Generate Next Week"}
           </button>
 
           <button

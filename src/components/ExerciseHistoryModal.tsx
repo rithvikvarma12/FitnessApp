@@ -82,6 +82,7 @@ interface ExerciseHistoryModalProps {
   meta?: ExerciseMeta;
   weeks: WeekPlan[];
   unit: Unit;
+  theme?: "dark" | "light";
   onClose: () => void;
 }
 
@@ -90,6 +91,7 @@ export default function ExerciseHistoryModal({
   meta,
   weeks,
   unit,
+  theme = "dark",
   onClose
 }: ExerciseHistoryModalProps) {
   const open = !!exerciseName;
@@ -125,14 +127,17 @@ export default function ExerciseHistoryModal({
     typeof p.bestE1RMKg === "number" ? Number(toDisplay(p.bestE1RMKg, unit).toFixed(2)) : null
   );
 
+  const chartTextColor = theme === "light" ? "#4a5568" : "#d8dee9";
+  const chartGridColor = theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
+
   const commonChartOptions: ChartOptions<"line"> = {
     responsive: true,
-    plugins: { legend: { labels: { color: "#e5e7eb" } } },
+    plugins: { legend: { labels: { color: chartTextColor } } },
     scales: {
-      x: { ticks: { color: "#e5e7eb" }, grid: { color: "#1f2937" } },
+      x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
       y: {
-        ticks: { color: "#e5e7eb" },
-        grid: { color: "#1f2937" }
+        ticks: { color: chartTextColor },
+        grid: { color: chartGridColor }
       }
     }
   };
@@ -247,7 +252,7 @@ export default function ExerciseHistoryModal({
               </div>
             ) : null}
 
-            <div className="card exerciseInfoSection" style={{ background: "#0b1220" }}>
+            <div className="card exerciseInfoSection" style={{ background: "var(--bg-deep)" }}>
               <div className="small muted" style={{ marginBottom: 8 }}>
                 {isCompound
                   ? compoundChartMode === "weight"

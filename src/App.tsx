@@ -174,14 +174,18 @@ export default function App() {
         </div>
 
         {/* Page content */}
-        {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : <ProfilePage />}
+        <div key={tab} className="tab-content">
+          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : <ProfilePage />}
+        </div>
       </div>
 
       {/* Bottom nav */}
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" aria-label="Main navigation">
         <button
           className={`bottom-nav-item ${tab === "plan" ? "active" : ""}`}
           onClick={() => setTab("plan")}
+          aria-label="Plan"
+          aria-current={tab === "plan" ? "page" : undefined}
         >
           <PlanIcon />
           Plan
@@ -189,6 +193,8 @@ export default function App() {
         <button
           className={`bottom-nav-item ${tab === "weight" ? "active" : ""}`}
           onClick={() => setTab("weight")}
+          aria-label="Weight"
+          aria-current={tab === "weight" ? "page" : undefined}
         >
           <WeightIcon />
           Weight
@@ -196,6 +202,8 @@ export default function App() {
         <button
           className={`bottom-nav-item ${tab === "progress" ? "active" : ""}`}
           onClick={() => setTab("progress")}
+          aria-label="Progress"
+          aria-current={tab === "progress" ? "page" : undefined}
         >
           <ProgressIcon />
           Progress
@@ -203,6 +211,8 @@ export default function App() {
         <button
           className={`bottom-nav-item ${tab === "profile" ? "active" : ""}`}
           onClick={() => setTab("profile")}
+          aria-label="Profile"
+          aria-current={tab === "profile" ? "page" : undefined}
         >
           <ProfileIcon />
           Profile
