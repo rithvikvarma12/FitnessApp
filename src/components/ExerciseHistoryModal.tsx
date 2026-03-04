@@ -7,7 +7,8 @@ import {
   LinearScale,
   CategoryScale,
   Tooltip,
-  Legend
+  Legend,
+  type ChartOptions
 } from "chart.js";
 import { classifyCompound } from "../db/db";
 import type { WeekPlan, ExerciseMeta } from "../db/types";
@@ -124,7 +125,7 @@ export default function ExerciseHistoryModal({
     typeof p.bestE1RMKg === "number" ? Number(toDisplay(p.bestE1RMKg, unit).toFixed(2)) : null
   );
 
-  const commonChartOptions: any = {
+  const commonChartOptions: ChartOptions<"line"> = {
     responsive: true,
     plugins: { legend: { labels: { color: "#e5e7eb" } } },
     scales: {

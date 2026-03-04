@@ -1,5 +1,6 @@
 import { db, getActiveUserId } from "../db/db";
-import { applyEquipmentToDayTemplates, remapDayTemplatesForTargetDays } from "./exerciseSelector";
+import { applyEquipmentToDayTemplates, remapDayTemplatesForTargetDays, normalizeName } from "./exerciseSelector";
+import { roundToNearest } from "./progressionEngine";
 import type {
   DayTemplate,
   ExerciseTemplate,
@@ -28,10 +29,6 @@ function addDaysISO(startISO: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function roundToNearest(value: number, step: number): number {
-  return Math.round(value / step) * step;
-}
-
 async function getOrCreateExercise(
   name: string,
   defaultSets: number,
@@ -49,10 +46,6 @@ async function exId(name: string): Promise<string> {
   const ex = await db.exerciseTemplates.where("name").equals(name).first();
   if (!ex) throw new Error(`Missing exercise template: ${name}`);
   return ex.id;
-}
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().trim();
 }
 
 function isCompoundName(name: string): boolean {

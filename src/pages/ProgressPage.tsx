@@ -18,6 +18,7 @@ import {
   LinearScale,
   Tooltip,
   Legend,
+  type ChartOptions
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 
@@ -104,7 +105,7 @@ function WeeklyVolumeChart({ summaries, unit, chartTextColor, chartGridColor }: 
     ],
   };
 
-  const options: any = {
+  const options: ChartOptions<"bar"> = {
     responsive: true,
     plugins: {
       legend: { labels: { color: chartTextColor } },

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { classifyCompound, db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
 import { lbToKg } from "../services/units";
-import { useLiveQuery } from "dexie-react-hooks";
 import type {
   WeekPlan,
   PlannedExercise,
