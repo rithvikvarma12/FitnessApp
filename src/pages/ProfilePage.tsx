@@ -64,6 +64,11 @@ export default function ProfilePage() {
     };
   }, [profile, unit]);
 
+  const restTimerEnabled = useLiveQuery(async () => {
+    const s = await db.settings.get("restTimerEnabled");
+    return s?.value !== "false";
+  }, [], true);
+
   const [form, setForm] = useState<FormState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -267,6 +272,17 @@ export default function ProfilePage() {
 
       <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 10 }}>
         Current weight: {latestWeight ? `${toDisplay(latestWeight.weightKg, unit).toFixed(1)} ${unit}` : "No entries yet"}
+      </div>
+
+      <div className="row" style={{ marginTop: 12, alignItems: "center", gap: 10 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+          <input
+            type="checkbox"
+            checked={restTimerEnabled ?? true}
+            onChange={(e) => void db.settings.put({ key: "restTimerEnabled", value: String(e.target.checked) })}
+          />
+          Auto rest timer after set completion
+        </label>
       </div>
 
       <div className="row" style={{ marginTop: 14, alignItems: "center", gap: 10 }}>

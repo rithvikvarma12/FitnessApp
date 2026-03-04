@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { classifyCompound, db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
@@ -23,6 +23,10 @@ import type {
   ExerciseTemplate,
   ExerciseEquipment
 } from "../db/types";
+import { findRecentPRs } from "../services/progressTracker";
+import type { PRComparison } from "../services/progressTracker";
+import RestTimer from "../components/RestTimer";
+import SessionSummary from "../components/SessionSummary";
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 
@@ -241,6 +245,17 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     dayExercises: PlannedExercise[];
   } | null>(null);
 
+  // Rest timer state
+  const [timerExerciseName, setTimerExerciseName] = useState<string | null>(null);
+  const [timerRemaining, setTimerRemaining] = useState(0);
+  const [timerTotal, setTimerTotal] = useState(0);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Session summary state
+  const [sessionSummaryDayId, setSessionSummaryDayId] = useState<string | null>(null);
+  const [pendingPRs, setPendingPRs] = useState<PRComparison[]>([]);
+
   const unit = useLiveQuery(async () => {
     const s = await db.settings.get("unit");
     return (s?.value as Unit) ?? "kg";
@@ -263,6 +278,10 @@ export default function WeekView({ week }: { week: WeekPlan }) {
   );
   const exerciseTemplates = useLiveQuery(() => db.exerciseTemplates.toArray(), [], [] as ExerciseTemplate[]);
   const exerciseMetaRows = useLiveQuery(() => db.exerciseMeta.toArray(), [], [] as ExerciseMeta[]);
+  const restTimerEnabled = useLiveQuery(async () => {
+    const s = await db.settings.get("restTimerEnabled");
+    return s?.value !== "false";
+  }, [], true);
 
   const exerciseTemplateIdByName = useMemo(
     () => new Map(exerciseTemplates.map((t) => [t.name, t.id])),
@@ -301,25 +320,102 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     exerciseMetaByTemplateId
   ]);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (timerDebounceRef.current) clearTimeout(timerDebounceRef.current);
+    };
+  }, []);
+
+  function startRestTimer(exerciseName: string) {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    const type = classifyCompound(exerciseName);
+    const total = type === "compound" ? 90 : 60;
+    setTimerExerciseName(exerciseName);
+    setTimerRemaining(total);
+    setTimerTotal(total);
+    timerIntervalRef.current = setInterval(() => {
+      setTimerRemaining((prev) => {
+        if (prev <= 1) {
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function stopRestTimer() {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    setTimerExerciseName(null);
+    setTimerRemaining(0);
+    setTimerTotal(0);
+  }
+
   async function updateWeek(updated: WeekPlan) {
     await db.weekPlans.update(week.id, updated);
   }
 
-  function setDayComplete(dayId: string, val: boolean) {
+  function requestDayComplete(dayId: string, val: boolean) {
+    if (val) {
+      const prs = findRecentPRs(allUserWeeks ?? [], week.weekNumber);
+      setPendingPRs(prs);
+      setSessionSummaryDayId(dayId);
+    } else {
+      const updated: WeekPlan = {
+        ...week,
+        days: week.days.map((d) => (d.id === dayId ? { ...d, isComplete: false } : d))
+      };
+      void updateWeek(updated);
+    }
+  }
+
+  function confirmDayComplete() {
+    if (!sessionSummaryDayId) return;
+    const dayId = sessionSummaryDayId;
+    setSessionSummaryDayId(null);
+    setPendingPRs([]);
+    const targetDay = week.days.find((d) => d.id === dayId);
+    const durationMinutes = targetDay?.workoutStartedAt
+      ? Math.round((Date.now() - new Date(targetDay.workoutStartedAt).getTime()) / 60000)
+      : undefined;
     const updated: WeekPlan = {
       ...week,
-      days: week.days.map((d) => (d.id === dayId ? { ...d, isComplete: val } : d))
+      days: week.days.map((d) =>
+        d.id === dayId ? { ...d, isComplete: true, workoutDurationMinutes: durationMinutes } : d
+      )
     };
     void updateWeek(updated);
   }
 
   function updateSet(dayId: string, exId: string, setNumber: number, patch: Partial<SetEntry>) {
+    const targetDay = week.days.find((d) => d.id === dayId);
+    const targetEx = targetDay?.exercises.find((e) => e.id === exId);
+    const isCompletingSet = patch.completed === true;
+    const needsStartTime = isCompletingSet && targetDay && !targetDay.workoutStartedAt;
+
+    if (isCompletingSet && restTimerEnabled && targetEx) {
+      if (timerDebounceRef.current) clearTimeout(timerDebounceRef.current);
+      timerDebounceRef.current = setTimeout(() => {
+        startRestTimer(targetEx.name);
+        timerDebounceRef.current = null;
+      }, 1500);
+    }
+
     const updated: WeekPlan = {
       ...week,
       days: week.days.map((d) => {
         if (d.id !== dayId) return d;
         return {
           ...d,
+          workoutStartedAt: needsStartTime ? new Date().toISOString() : d.workoutStartedAt,
           exercises: d.exercises.map((ex) => {
             if (ex.id !== exId) return ex;
             return {
@@ -508,7 +604,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
           day={day}
           unit={unit}
           isLocked={week.isLocked}
-          onDayComplete={setDayComplete}
+          onDayComplete={requestDayComplete}
           onSetUpdate={updateSet}
           onExerciseBasePlanUpdate={updateExerciseBasePlannedWeight}
           onApplyBaseToAllSets={applyBasePlannedWeightToAllSets}
@@ -523,6 +619,10 @@ export default function WeekView({ week }: { week: WeekPlan }) {
               dayExercises
             });
           }}
+          timerExerciseName={timerExerciseName}
+          timerRemaining={timerRemaining}
+          timerTotal={timerTotal}
+          onRestTimerDismiss={stopRestTimer}
         />
       ))}
 
@@ -551,6 +651,19 @@ export default function WeekView({ week }: { week: WeekPlan }) {
           swapExerciseInDay(alternativePicker.dayId, alternativePicker.exId, option.name);
         }}
       />
+
+      {sessionSummaryDayId && (() => {
+        const summaryDay = week.days.find((d) => d.id === sessionSummaryDayId);
+        return summaryDay ? (
+          <SessionSummary
+            day={summaryDay}
+            unit={unit}
+            prs={pendingPRs}
+            onConfirm={confirmDayComplete}
+            onCancel={() => { setSessionSummaryDayId(null); setPendingPRs([]); }}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }
@@ -567,7 +680,11 @@ function DayCard({
   onRampPlanFromBase,
   onSetPlanToLastActual,
   onExerciseInfoOpen,
-  onExerciseAlternativesOpen
+  onExerciseAlternativesOpen,
+  timerExerciseName,
+  timerRemaining,
+  timerTotal,
+  onRestTimerDismiss
 }: {
   defaultExpanded: boolean;
   day: WorkoutDay;
@@ -581,10 +698,29 @@ function DayCard({
   onSetPlanToLastActual: (dayId: string, exId: string) => void;
   onExerciseInfoOpen: (exerciseName: string) => void;
   onExerciseAlternativesOpen: (dayId: string, ex: PlannedExercise, dayExercises: PlannedExercise[]) => void;
+  timerExerciseName: string | null;
+  timerRemaining: number;
+  timerTotal: number;
+  onRestTimerDismiss: () => void;
 }) {
   const dateLabel = format(parseISO(day.dateISO), "EEE, MMM d");
   const [expanded, setExpanded] = useState(defaultExpanded);
   const accentColor = getDayAccentColor(day.title);
+  const [elapsedMin, setElapsedMin] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!day.workoutStartedAt || day.isComplete) {
+      setElapsedMin(null);
+      return;
+    }
+    const update = () => {
+      const mins = Math.round((Date.now() - new Date(day.workoutStartedAt!).getTime()) / 60000);
+      setElapsedMin(mins);
+    };
+    update();
+    const id = setInterval(update, 30000);
+    return () => clearInterval(id);
+  }, [day.workoutStartedAt, day.isComplete]);
 
   return (
     <div
@@ -593,7 +729,12 @@ function DayCard({
     >
       <div className="dayCardHeader">
         <div className="dayHeaderMain">
-          <div className="dayTitle">{day.title}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="dayTitle">{day.title}</div>
+            {elapsedMin !== null && (
+              <span className="day-duration-badge">{elapsedMin}m</span>
+            )}
+          </div>
           <div className="dayDate">{dateLabel}</div>
         </div>
 
@@ -646,6 +787,10 @@ function DayCard({
                 onExerciseInfoOpen={onExerciseInfoOpen}
                 onExerciseAlternativesOpen={onExerciseAlternativesOpen}
                 dayExercises={day.exercises}
+                timerExerciseName={timerExerciseName}
+                timerRemaining={timerRemaining}
+                timerTotal={timerTotal}
+                onRestTimerDismiss={onRestTimerDismiss}
               />
             ))}
           </div>
@@ -667,7 +812,11 @@ function ExerciseCard({
   onSetPlanToLastActual,
   onExerciseInfoOpen,
   onExerciseAlternativesOpen,
-  dayExercises
+  dayExercises,
+  timerExerciseName,
+  timerRemaining,
+  timerTotal,
+  onRestTimerDismiss
 }: {
   dayId: string;
   ex: PlannedExercise;
@@ -681,6 +830,10 @@ function ExerciseCard({
   onSetPlanToLastActual: (dayId: string, exId: string) => void;
   onExerciseInfoOpen: (exerciseName: string) => void;
   onExerciseAlternativesOpen: (dayId: string, ex: PlannedExercise, dayExercises: PlannedExercise[]) => void;
+  timerExerciseName: string | null;
+  timerRemaining: number;
+  timerTotal: number;
+  onRestTimerDismiss: () => void;
 }) {
   const lastActualWeightKg = lastNonEmptyActualWeightKg(ex);
 
@@ -824,6 +977,15 @@ function ExerciseCard({
           );
         })}
       </div>
+
+      {timerExerciseName === ex.name && (
+        <RestTimer
+          exerciseName={ex.name}
+          remaining={timerRemaining}
+          total={timerTotal}
+          onDismiss={onRestTimerDismiss}
+        />
+      )}
     </div>
   );
 }

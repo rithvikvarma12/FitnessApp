@@ -943,3 +943,180 @@ select option {
 
   .stat-box-value { font-size: 12px; }
 }
+
+/* ── Rest Timer ──────────────────────────────────────────────────────────── */
+.rest-timer-bar {
+  position: relative;
+  margin-top: 10px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+}
+
+.rest-timer-progress {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(59, 130, 246, 0.25);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.rest-timer-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.rest-timer-label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rest-timer-countdown {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 36px;
+  text-align: right;
+}
+
+.rest-timer-skip {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.rest-timer-skip:hover {
+  color: var(--text-primary);
+}
+
+/* ── Duration Badge ──────────────────────────────────────────────────────── */
+.day-duration-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-orange);
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+/* ── Session Summary Modal ───────────────────────────────────────────────── */
+.session-summary-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min(480px, 100%);
+}
+
+.session-summary-header {
+  text-align: center;
+}
+
+.session-summary-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.session-summary-subtitle {
+  font-size: 12px;
+  color: var(--accent-green);
+  font-weight: 600;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.session-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.session-stat-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.session-stat-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.session-stat-denom {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.session-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+.session-prs {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.session-prs-heading {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-green);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.session-pr-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.session-pr-name {
+  color: var(--text-secondary);
+}
+
+.session-pr-delta {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-green);
+}
+
+.session-summary-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}

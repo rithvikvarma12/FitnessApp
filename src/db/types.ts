@@ -99,6 +99,8 @@ export type WorkoutDay = {
     intensity?: "easy" | "moderate" | "hard";
   };
   isComplete: boolean;
+  workoutStartedAt?: string; // ISO timestamp of first set completion
+  workoutDurationMinutes?: number; // saved on day completion
 };
 
 export type WeekPlan = {
