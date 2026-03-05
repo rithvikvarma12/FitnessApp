@@ -58,7 +58,6 @@ export default function ExerciseInfoModal({
             <div className="row" style={{ gap: 6 }}>
               <span className="tag tag--blue">{resolvedType}</span>
               {meta?.equipment ? <span className="tag tag--purple">{meta.equipment}</span> : null}
-              {meta?.movementPattern ? <span className="tag" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-glass-hover)", color: "var(--text-secondary)" }}>{meta.movementPattern}</span> : null}
             </div>
           </div>
           <div className="row" style={{ gap: 8 }}>
@@ -80,7 +79,7 @@ export default function ExerciseInfoModal({
           <MuscleMap
             primaryMuscles={muscleTargets.primary}
             secondaryMuscles={muscleTargets.secondary}
-            size={180}
+            size={200}
           />
           {(muscleTargets.primary.length > 0 || muscleTargets.secondary.length > 0) && (
             <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 8, flexWrap: "wrap" }}>
@@ -133,10 +132,6 @@ export default function ExerciseInfoModal({
                 <span>None listed</span>
               )}
             </div>
-          </div>
-          <div className="card exerciseInfoSection">
-            <div className="small muted">Movement pattern</div>
-            <div>{meta?.movementPattern ?? "Not set"}</div>
           </div>
         </div>
 
