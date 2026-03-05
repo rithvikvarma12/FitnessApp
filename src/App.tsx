@@ -189,7 +189,7 @@ export default function App() {
 
         {/* Page content */}
         <div key={tab} className="tab-content">
-          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : tab === "nutrition" ? <NutritionPage /> : <ProfilePage />}
+          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : tab === "nutrition" ? <NutritionPage onGoToProfile={() => setTab("profile")} /> : <ProfilePage />}
         </div>
       </div>
 

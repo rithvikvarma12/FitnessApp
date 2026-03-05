@@ -103,10 +103,13 @@ export default function ProfilePage() {
   const [nutritionCustom, setNutritionCustom] = useState<{ calories: string; protein: string; carbs: string; fat: string } | null>(null);
   const [nutritionExpanded, setNutritionExpanded] = useState(false);
 
-  // Sync body stats inputs from profile
+  // Sync body stats inputs from profile; auto-expand if stats are already set
   useEffect(() => {
     if (!profile) return;
-    if (typeof profile.heightCm === "number") setHeightInput(String(profile.heightCm));
+    if (typeof profile.heightCm === "number") {
+      setHeightInput(String(profile.heightCm));
+      setNutritionExpanded(true);
+    }
     if (typeof profile.age === "number") setAgeInput(String(profile.age));
     if (profile.gender) setGenderInput(profile.gender);
     setActivityInput(String(profile.activityMultiplier ?? defaultActivityMultiplier(profile.daysPerWeek)));
@@ -445,14 +448,14 @@ export default function ProfilePage() {
               {nutritionSettings?.enabled ? "On" : "Off"}
             </button>
             <button className="secondary" style={{ padding: "4px 10px", fontSize: 11 }} onClick={() => setNutritionExpanded((v) => !v)}>
-              {nutritionExpanded ? "Hide" : "Setup"}
+              {nutritionExpanded ? "Hide" : "Adjust"}
             </button>
           </div>
         </div>
 
         {nutritionExpanded && (
           <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Body stats are used to estimate your TDEE and macro targets.</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Adjust your body stats to recalculate TDEE and macro targets.</div>
 
             {/* Body Stats */}
             <div className="row" style={{ gap: 8 }}>

@@ -6,6 +6,7 @@ import { createFirstWeekIfMissing } from "../services/planGenerator";
 import { initDemoPresetForUser, initRithvikPresetWeek6ForUser } from "../services/presets";
 import { deriveAutoCardio, defaultCardioTypeForGoal } from "../services/cardio";
 import { fromDisplay, toDisplay } from "../services/units";
+import { generateNutritionSettings, defaultActivityMultiplier } from "../services/nutritionCalculator";
 
 type PresetKey = "generic" | "rithvik" | "demo";
 
@@ -23,6 +24,10 @@ type FormState = {
   cardioSessionsPerWeek: number;
   cardioMinutesPerSession: number;
   notes: string;
+  // body stats for nutrition
+  heightCm: string;
+  age: string;
+  gender: "male" | "female";
 };
 
 function withAutoCardio(base: Omit<FormState, "cardioGoalAuto" | "cardioType" | "cardioSessionsPerWeek" | "cardioMinutesPerSession">): FormState {
@@ -45,7 +50,10 @@ const baseGeneric = withAutoCardio({
   targetWeight: "",
   experience: "beginner",
   equipment: "gym",
-  notes: ""
+  notes: "",
+  heightCm: "",
+  age: "",
+  gender: "male",
 });
 
 const baseRithvik = withAutoCardio({
@@ -57,7 +65,10 @@ const baseRithvik = withAutoCardio({
   targetWeight: "72",
   experience: "intermediate",
   equipment: "gym",
-  notes: "Rithvik preset onboarding"
+  notes: "Rithvik preset onboarding",
+  heightCm: "180",
+  age: "22",
+  gender: "male",
 });
 
 const baseDemo = withAutoCardio({
@@ -69,7 +80,10 @@ const baseDemo = withAutoCardio({
   targetWeight: "78",
   experience: "intermediate",
   equipment: "gym",
-  notes: "Demo sample data preset"
+  notes: "Demo sample data preset",
+  heightCm: "178",
+  age: "28",
+  gender: "male",
 });
 
 function presetDefaults(preset: PresetKey): FormState {
@@ -134,6 +148,17 @@ export default function SetupPage() {
         throw new Error("Target weight is required for cut and bulk.");
       }
 
+      const heightCm = Number(form.heightCm);
+      const age = Number(form.age);
+      if (!heightCm || heightCm < 100 || heightCm > 250) {
+        throw new Error("Please enter a valid height (100–250 cm).");
+      }
+      if (!age || age < 10 || age > 100) {
+        throw new Error("Please enter a valid age.");
+      }
+
+      const activityMultiplier = defaultActivityMultiplier(form.daysPerWeek);
+
       const profile: UserProfile = {
         id: crypto.randomUUID(),
         name:
@@ -156,10 +181,21 @@ export default function SetupPage() {
         cardioSessionsPerWeek: form.cardioSessionsPerWeek,
         cardioMinutesPerSession: form.cardioMinutesPerSession,
         notes: form.notes.trim() || undefined,
+        heightCm,
+        age,
+        gender: form.gender,
+        activityMultiplier,
         createdAtISO: new Date().toISOString()
       };
 
       await db.userProfiles.add(profile);
+
+      // Auto-create nutrition settings from body stats
+      const ns = generateNutritionSettings(profile, currentWeightKg);
+      if (ns) {
+        await db.nutritionSettings.put(ns);
+      }
+
       await db.settings.put({ key: "activeUserId", value: profile.id });
       await db.settings.put({ key: "unit", value: profile.unit });
       await db.weightEntries.put({
@@ -291,6 +327,45 @@ export default function SetupPage() {
         </div>
       </div>
 
+      {/* Body stats */}
+      <div className="row" style={{ marginTop: 10 }}>
+        <div style={{ flex: "1 1 100px" }}>
+          {fl("Height (cm)")}
+          <input
+            inputMode="decimal"
+            placeholder="e.g. 175"
+            value={form.heightCm}
+            onChange={(e) => setField("heightCm", e.target.value)}
+          />
+        </div>
+        <div style={{ flex: "1 1 80px" }}>
+          {fl("Age")}
+          <input
+            inputMode="numeric"
+            placeholder="e.g. 25"
+            value={form.age}
+            onChange={(e) => setField("age", e.target.value)}
+          />
+        </div>
+        <div style={{ flex: "1 1 120px" }}>
+          {fl("Gender")}
+          <div className="unit-toggle">
+            <button
+              className={`unit-toggle-btn ${form.gender === "male" ? "active" : ""}`}
+              onClick={() => setField("gender", "male")}
+            >
+              Male
+            </button>
+            <button
+              className={`unit-toggle-btn ${form.gender === "female" ? "active" : ""}`}
+              onClick={() => setField("gender", "female")}
+            >
+              Female
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="row" style={{ marginTop: 10 }}>
         <div className="col">
           {fl("Experience")}
@@ -410,9 +485,56 @@ export default function SetupPage() {
         />
       </div>
 
+      {/* Plan summary — shown when all required fields are filled */}
+      {(() => {
+        const h = Number(form.heightCm);
+        const a = Number(form.age);
+        const wRaw = Number(form.currentWeight);
+        if (!h || !a || !Number.isFinite(wRaw) || wRaw <= 0) return null;
+        const wKg = fromDisplay(wRaw, form.unit);
+        const act = defaultActivityMultiplier(form.daysPerWeek);
+        const fakeProfile = {
+          id: "preview", name: "", unit: form.unit, daysPerWeek: form.daysPerWeek,
+          goalMode: form.goalMode, experience: form.experience, equipment: form.equipment,
+          cardioGoalAuto: false, cardioType: "LISS" as const,
+          cardioSessionsPerWeek: 0, cardioMinutesPerSession: 0,
+          heightCm: h, age: a, gender: form.gender, activityMultiplier: act,
+          createdAtISO: ""
+        };
+        const ns = generateNutritionSettings(fakeProfile, wKg);
+        if (!ns) return null;
+        return (
+          <div style={{
+            background: "rgba(59,130,246,0.06)",
+            border: "1px solid rgba(59,130,246,0.18)",
+            borderLeft: "2px solid var(--accent-blue)",
+            borderRadius: "var(--radius-md)",
+            padding: "12px 14px",
+            marginTop: 8
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--accent-blue)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+              Your Plan
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.6 }}>
+              <strong>{form.daysPerWeek} days/week</strong> training &nbsp;·&nbsp;
+              <strong>{ns.calorieTarget.toLocaleString()} kcal/day</strong>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
+              Protein <strong style={{ color: "var(--text-primary)" }}>{ns.proteinGrams}g</strong>
+              &nbsp;·&nbsp;
+              Carbs <strong style={{ color: "var(--text-primary)" }}>{ns.carbsGrams}g</strong>
+              &nbsp;·&nbsp;
+              Fat <strong style={{ color: "var(--text-primary)" }}>{ns.fatGrams}g</strong>
+              &nbsp;·&nbsp;
+              <span style={{ color: "var(--text-muted)" }}>TDEE {ns.calculatedTDEE?.toLocaleString()} kcal</span>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="row" style={{ alignItems: "center", marginTop: 14, gap: 10 }}>
         <button disabled={busy} onClick={createProfile}>
-          Create Profile
+          {busy ? "Creating…" : "Create Profile"}
         </button>
         {err && (
           <span className="tag tag--red" style={{ padding: "6px 10px" }}>{err}</span>

@@ -77,7 +77,11 @@ function MacroBar({ label, value, target, color }: MacroBarProps) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function NutritionPage() {
+interface NutritionPageProps {
+  onGoToProfile?: () => void;
+}
+
+export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const theme = useLiveQuery(async () => {
     const s = await db.settings.get("theme");
@@ -86,6 +90,11 @@ export default function NutritionPage() {
 
   const settings = useLiveQuery(
     async () => activeUserId ? db.nutritionSettings.get(activeUserId) : undefined,
+    [activeUserId]
+  );
+
+  const profile = useLiveQuery(
+    async () => activeUserId ? db.userProfiles.get(activeUserId) : undefined,
     [activeUserId]
   );
 
@@ -216,6 +225,27 @@ export default function NutritionPage() {
           <div className="empty-state-icon">🥗</div>
           <div className="empty-state-title">Nutrition tracking off</div>
           <div className="empty-state-body">Enable nutrition tracking in Profile → Nutrition to get started.</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Existing profile without body stats — guide them to set up
+  const missingBodyStats = profile && (!profile.heightCm || !profile.age || !profile.gender);
+  if (missingBodyStats) {
+    return (
+      <div className="card">
+        <div className="empty-state">
+          <div className="empty-state-icon">📏</div>
+          <div className="empty-state-title">Body stats needed</div>
+          <div className="empty-state-body">
+            Enter your height, age, and gender to calculate your calorie and macro targets.
+          </div>
+          {onGoToProfile && (
+            <button onClick={onGoToProfile} style={{ marginTop: 8 }}>
+              Go to Profile settings
+            </button>
+          )}
         </div>
       </div>
     );
