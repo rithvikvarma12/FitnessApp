@@ -4,7 +4,7 @@ A Progressive Web App built with React + TypeScript + Vite + Dexie (IndexedDB) t
 
 ## Current Version
 
-v0.7.0 – Progress Dashboard, Custom Exercises & Theme System
+v0.8.0 — Nutrition & Exercise Visualization
 
 ## Features
 
@@ -27,7 +27,7 @@ v0.7.0 – Progress Dashboard, Custom Exercises & Theme System
 ### Weight Tracking
 - Daily weigh-in log with moving 7-day average trend
 - Goal weight line on chart
-- Goal-reached banner with transition options (Maintain / Bulk / New Goal)
+- Goal-reached banner with transition options — always prompts for new target weight
 
 ### Progress Dashboard
 - Current and longest workout streaks, overall completion rate
@@ -38,9 +38,20 @@ v0.7.0 – Progress Dashboard, Custom Exercises & Theme System
 - Session summary modal on day completion
 - PR celebration overlay for noteworthy PRs (≥2.5 kg compounds, ≥1.0 kg isolations)
 
+### Nutrition Tracking
+- TDEE calculator (Mifflin-St Jeor) based on body stats, activity level, and goal mode
+- Auto-calculated calorie and macro targets (protein / carbs / fat) from day one
+- Targets auto-recalculate as weight changes — no manual updates needed
+- Daily nutrition logging with progress rings and macro fill bars
+- "Hit target today" qualitative mode for days without detailed logging
+- Weekly adherence chart on the Progress page
+- Fully customizable targets with per-macro tracking toggles
+
 ### Exercise System
 - Exercise history charts (best weight + estimated 1RM for compounds)
-- Exercise info cards with muscles, cues, and video links
+- Exercise info cards with SVG muscle map (front + back body silhouette), cues, and video links
+- Primary muscles highlighted red, secondary orange on the body map
+- Progress page shows full-body muscle coverage map for the last 4 weeks
 - Custom exercise creation per user (name, muscle group, type, equipment)
 - Custom exercises appear in swap suggestions and plan generation
 
@@ -77,7 +88,8 @@ npm run build   # production build
 
 | Version | Highlights |
 |---|---|
-| v0.7 | Progress dashboard, PR tracking, rest timer, workout duration, session summary, custom exercises, light/dark theme, code refactor |
+| v0.8 | Nutrition system (TDEE, macros, daily logging, adherence), SVG muscle map, goal switching improvements |
+| v0.7 | UI overhaul (dark athletic theme, bottom nav, glass cards), progress dashboard, PR tracking, rest timer, workout duration, session summary, custom exercises, light/dark theme, code refactor |
 | v0.5 | Goal↔weight sync, goal-reached banner, exercise history charts, data export/import |
 | v0.4 | Profile system, equipment logic, cardio, exercise meta |
 | v0.3 | Dynamic week generation, notes-based adjustment, unit toggle, weight tracker |
