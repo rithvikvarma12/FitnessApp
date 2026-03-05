@@ -10,8 +10,9 @@ import SetupPage from "./pages/SetupPage";
 import WeightPage from "./pages/WeightPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProgressPage from "./pages/ProgressPage";
+import NutritionPage from "./pages/NutritionPage";
 
-type Tab = "plan" | "weight" | "progress" | "profile";
+type Tab = "plan" | "weight" | "progress" | "nutrition" | "profile";
 
 function PlanIcon() {
   return (
@@ -33,6 +34,14 @@ function ProgressIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
       <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+  );
+}
+
+function NutritionIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 2v8a2 2 0 002 2h1v8h2v-8h1a2 2 0 002-2V2h-2v5H8V2H6v5H5V2H3zm14 0c-1.7 0-3 1.3-3 3v5h2v10h2V2h-1z" />
     </svg>
   );
 }
@@ -63,6 +72,11 @@ export default function App() {
     const s = await db.settings.get("theme");
     return (s?.value ?? "dark") as "dark" | "light";
   }, [], "dark" as "dark" | "light");
+  const nutritionEnabled = useLiveQuery(async () => {
+    if (!activeUserId) return false;
+    const ns = await db.nutritionSettings.get(activeUserId);
+    return ns?.enabled ?? false;
+  }, [activeUserId], false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -175,45 +189,31 @@ export default function App() {
 
         {/* Page content */}
         <div key={tab} className="tab-content">
-          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : <ProfilePage />}
+          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : tab === "nutrition" ? <NutritionPage /> : <ProfilePage />}
         </div>
       </div>
 
       {/* Bottom nav */}
-      <nav className="bottom-nav" aria-label="Main navigation">
-        <button
-          className={`bottom-nav-item ${tab === "plan" ? "active" : ""}`}
-          onClick={() => setTab("plan")}
-          aria-label="Plan"
-          aria-current={tab === "plan" ? "page" : undefined}
-        >
+      <nav className={`bottom-nav ${nutritionEnabled ? "bottom-nav--five" : ""}`} aria-label="Main navigation">
+        <button className={`bottom-nav-item ${tab === "plan" ? "active" : ""}`} onClick={() => setTab("plan")} aria-label="Plan" aria-current={tab === "plan" ? "page" : undefined}>
           <PlanIcon />
           Plan
         </button>
-        <button
-          className={`bottom-nav-item ${tab === "weight" ? "active" : ""}`}
-          onClick={() => setTab("weight")}
-          aria-label="Weight"
-          aria-current={tab === "weight" ? "page" : undefined}
-        >
+        <button className={`bottom-nav-item ${tab === "weight" ? "active" : ""}`} onClick={() => setTab("weight")} aria-label="Weight" aria-current={tab === "weight" ? "page" : undefined}>
           <WeightIcon />
           Weight
         </button>
-        <button
-          className={`bottom-nav-item ${tab === "progress" ? "active" : ""}`}
-          onClick={() => setTab("progress")}
-          aria-label="Progress"
-          aria-current={tab === "progress" ? "page" : undefined}
-        >
+        <button className={`bottom-nav-item ${tab === "progress" ? "active" : ""}`} onClick={() => setTab("progress")} aria-label="Progress" aria-current={tab === "progress" ? "page" : undefined}>
           <ProgressIcon />
           Progress
         </button>
-        <button
-          className={`bottom-nav-item ${tab === "profile" ? "active" : ""}`}
-          onClick={() => setTab("profile")}
-          aria-label="Profile"
-          aria-current={tab === "profile" ? "page" : undefined}
-        >
+        {nutritionEnabled && (
+          <button className={`bottom-nav-item ${tab === "nutrition" ? "active" : ""}`} onClick={() => setTab("nutrition")} aria-label="Nutrition" aria-current={tab === "nutrition" ? "page" : undefined}>
+            <NutritionIcon />
+            Nutrition
+          </button>
+        )}
+        <button className={`bottom-nav-item ${tab === "profile" ? "active" : ""}`} onClick={() => setTab("profile")} aria-label="Profile" aria-current={tab === "profile" ? "page" : undefined}>
           <ProfileIcon />
           Profile
         </button>

@@ -9,7 +9,9 @@ import type {
   UserProfile,
   ExerciseMeta,
   ExerciseMetaType,
-  CustomExercise
+  CustomExercise,
+  NutritionSettings,
+  DailyNutritionLog
 } from "./types";
 
 export type Setting = { key: string; value: string };
@@ -39,6 +41,8 @@ export class AppDB extends Dexie {
   exerciseTemplates!: Table<ExerciseTemplate, string>;
   exerciseMeta!: Table<ExerciseMeta, string>;
   customExercises!: Table<CustomExercise, string>;
+  nutritionSettings!: Table<NutritionSettings, string>;
+  dailyNutritionLogs!: Table<DailyNutritionLog, string>;
   weekPlans!: Table<WeekPlan, string>;
   weightEntries!: Table<WeightEntry, string>;
   userProfiles!: Table<UserProfile, string>;
@@ -179,6 +183,20 @@ export class AppDB extends Dexie {
       exerciseTemplates: "id, name",
       exerciseMeta: "exerciseTemplateId",
       customExercises: "id, userId, name",
+      weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
+      weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
+      settings: "key",
+      userProfiles: "id, createdAtISO"
+    });
+
+    // v8 (nutrition tracking)
+    this.version(8).stores({
+      planTemplates: "id, name",
+      exerciseTemplates: "id, name",
+      exerciseMeta: "exerciseTemplateId",
+      customExercises: "id, userId, name",
+      nutritionSettings: "id, userId",
+      dailyNutritionLogs: "id, userId, dateISO, [userId+dateISO]",
       weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
       weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
       settings: "key",

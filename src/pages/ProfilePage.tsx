@@ -3,7 +3,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
 import { fromDisplay, toDisplay } from "../services/units";
-import type { CustomExercise, ExerciseTemplate } from "../db/types";
+import type { CustomExercise, ExerciseTemplate, NutritionSettings } from "../db/types";
+import { generateNutritionSettings, defaultActivityMultiplier } from "../services/nutritionCalculator";
 
 type GoalMode = "cut" | "maintain" | "bulk";
 type Equipment = "gym" | "home" | "minimal";
@@ -81,6 +82,11 @@ export default function ProfilePage() {
     () => db.exerciseTemplates.toArray(), [], [] as ExerciseTemplate[]
   );
 
+  const nutritionSettings = useLiveQuery(
+    async () => activeUserId ? db.nutritionSettings.get(activeUserId) : undefined,
+    [activeUserId]
+  );
+
   const [form, setForm] = useState<FormState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -88,6 +94,23 @@ export default function ProfilePage() {
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const [customForm, setCustomForm] = useState({ name: "", muscleGroup: "chest", type: "isolation", equipment: "dumbbell", notes: "" });
   const [customError, setCustomError] = useState<string | null>(null);
+
+  // Nutrition body stats form
+  const [heightInput, setHeightInput] = useState("");
+  const [ageInput, setAgeInput] = useState("");
+  const [genderInput, setGenderInput] = useState<"male" | "female">("male");
+  const [activityInput, setActivityInput] = useState("1.55");
+  const [nutritionCustom, setNutritionCustom] = useState<{ calories: string; protein: string; carbs: string; fat: string } | null>(null);
+  const [nutritionExpanded, setNutritionExpanded] = useState(false);
+
+  // Sync body stats inputs from profile
+  useEffect(() => {
+    if (!profile) return;
+    if (typeof profile.heightCm === "number") setHeightInput(String(profile.heightCm));
+    if (typeof profile.age === "number") setAgeInput(String(profile.age));
+    if (profile.gender) setGenderInput(profile.gender);
+    setActivityInput(String(profile.activityMultiplier ?? defaultActivityMultiplier(profile.daysPerWeek)));
+  }, [profile]);
 
   useEffect(() => {
     setForm(initialForm);
@@ -394,6 +417,194 @@ export default function ProfilePage() {
           />
           {dataMsg ? <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{dataMsg}</span> : null}
         </div>
+      </div>
+
+      {/* Nutrition */}
+      <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)", padding: "12px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <h3 style={{ margin: 0 }}>Nutrition</h3>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Track nutrition</span>
+            <button
+              className={nutritionSettings?.enabled ? "" : "secondary"}
+              style={{ padding: "4px 10px", fontSize: 11 }}
+              onClick={async () => {
+                if (!activeUserId) return;
+                const current = await db.nutritionSettings.get(activeUserId);
+                if (current) {
+                  await db.nutritionSettings.update(activeUserId, { enabled: !current.enabled });
+                } else {
+                  await db.nutritionSettings.put({
+                    id: activeUserId, userId: activeUserId, enabled: true,
+                    calorieTarget: 2000, proteinGrams: 150, carbsGrams: 200, fatGrams: 65,
+                    trackProtein: true, trackCarbs: true, trackFat: true, isCustom: false
+                  });
+                }
+              }}
+            >
+              {nutritionSettings?.enabled ? "On" : "Off"}
+            </button>
+            <button className="secondary" style={{ padding: "4px 10px", fontSize: 11 }} onClick={() => setNutritionExpanded((v) => !v)}>
+              {nutritionExpanded ? "Hide" : "Setup"}
+            </button>
+          </div>
+        </div>
+
+        {nutritionExpanded && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Body stats are used to estimate your TDEE and macro targets.</div>
+
+            {/* Body Stats */}
+            <div className="row" style={{ gap: 8 }}>
+              <div style={{ flex: "1 1 120px" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Height (cm)</div>
+                <input inputMode="decimal" placeholder="175" value={heightInput} onChange={(e) => setHeightInput(e.target.value)} />
+              </div>
+              <div style={{ flex: "1 1 80px" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Age</div>
+                <input inputMode="numeric" placeholder="25" value={ageInput} onChange={(e) => setAgeInput(e.target.value)} />
+              </div>
+              <div style={{ flex: "1 1 120px" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Gender</div>
+                <div className="unit-toggle">
+                  <button className={`unit-toggle-btn ${genderInput === "male" ? "active" : ""}`} onClick={() => setGenderInput("male")}>Male</button>
+                  <button className={`unit-toggle-btn ${genderInput === "female" ? "active" : ""}`} onClick={() => setGenderInput("female")}>Female</button>
+                </div>
+              </div>
+              <div style={{ flex: "2 1 180px" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Activity Level</div>
+                <select value={activityInput} onChange={(e) => setActivityInput(e.target.value)}>
+                  <option value="1.2">Sedentary (desk job, no exercise)</option>
+                  <option value="1.375">Lightly Active (1–3 days/wk)</option>
+                  <option value="1.55">Moderately Active (3–5 days/wk)</option>
+                  <option value="1.725">Very Active (6–7 days/wk)</option>
+                  <option value="1.9">Extremely Active (athlete)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Calculated targets preview */}
+            {(() => {
+              const h = Number(heightInput);
+              const a = Number(ageInput);
+              const act = Number(activityInput);
+              const wKg = latestWeight?.weightKg ?? profile.currentWeightKg;
+              if (!h || !a || !wKg || !Number.isFinite(act)) return null;
+              const settings = generateNutritionSettings({ ...profile, heightCm: h, age: a, gender: genderInput, activityMultiplier: act }, wKg);
+              if (!settings) return null;
+              const goalLabel = form.goalMode === "cut" ? "Cut" : form.goalMode === "bulk" ? "Bulk" : "Maintain";
+              return (
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)", padding: "10px 12px", display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    Estimated TDEE: <strong style={{ color: "var(--text-primary)" }}>{settings.calculatedTDEE?.toLocaleString()} kcal</strong>
+                    &nbsp;·&nbsp;{goalLabel} target: <strong style={{ color: "var(--accent-blue)" }}>{settings.calorieTarget.toLocaleString()} kcal</strong>
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    <span>Protein <strong style={{ color: "var(--text-primary)" }}>{settings.proteinGrams}g</strong></span>
+                    <span>Carbs <strong style={{ color: "var(--text-primary)" }}>{settings.carbsGrams}g</strong></span>
+                    <span>Fat <strong style={{ color: "var(--text-primary)" }}>{settings.fatGrams}g</strong></span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Custom override toggle */}
+            {nutritionSettings && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  className="secondary"
+                  style={{ padding: "4px 10px", fontSize: 11 }}
+                  onClick={() => {
+                    if (nutritionCustom) {
+                      setNutritionCustom(null);
+                    } else {
+                      setNutritionCustom({
+                        calories: String(nutritionSettings.calorieTarget),
+                        protein: String(nutritionSettings.proteinGrams),
+                        carbs: String(nutritionSettings.carbsGrams),
+                        fat: String(nutritionSettings.fatGrams),
+                      });
+                    }
+                  }}
+                >
+                  {nutritionCustom ? "Cancel override" : "Customize targets"}
+                </button>
+                {nutritionSettings.isCustom && (
+                  <button
+                    className="secondary"
+                    style={{ padding: "4px 10px", fontSize: 11 }}
+                    onClick={async () => {
+                      if (!activeUserId) return;
+                      const wKg = latestWeight?.weightKg ?? profile.currentWeightKg;
+                      if (!wKg) return;
+                      const h = Number(heightInput); const a = Number(ageInput); const act = Number(activityInput);
+                      const recalc = generateNutritionSettings({ ...profile, heightCm: h || profile.heightCm, age: a || profile.age, gender: genderInput, activityMultiplier: act }, wKg);
+                      if (!recalc) return;
+                      await db.nutritionSettings.put({ ...recalc, id: activeUserId, userId: activeUserId });
+                      setNutritionCustom(null);
+                    }}
+                  >
+                    Reset to calculated
+                  </button>
+                )}
+              </div>
+            )}
+
+            {nutritionCustom && (
+              <div className="row" style={{ gap: 8 }}>
+                {(["calories", "protein", "carbs", "fat"] as const).map((k) => (
+                  <div key={k} style={{ flex: "1 1 80px" }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{k === "calories" ? "kcal" : k + "g"}</div>
+                    <input inputMode="numeric" value={nutritionCustom[k]} onChange={(e) => setNutritionCustom((p) => p ? { ...p, [k]: e.target.value } : p)} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={async () => {
+                if (!activeUserId) return;
+                const h = Number(heightInput);
+                const a = Number(ageInput);
+                const act = Number(activityInput);
+                if (!h || !a) return;
+                await db.userProfiles.update(activeUserId, { heightCm: h, age: a, gender: genderInput, activityMultiplier: act } as Partial<typeof profile>);
+                const wKg = latestWeight?.weightKg ?? profile.currentWeightKg ?? 70;
+                const base = generateNutritionSettings({ ...profile, heightCm: h, age: a, gender: genderInput, activityMultiplier: act }, wKg);
+                const existing = await db.nutritionSettings.get(activeUserId);
+                if (nutritionCustom && existing?.isCustom) {
+                  await db.nutritionSettings.put({
+                    ...(existing ?? { id: activeUserId, userId: activeUserId, trackProtein: true, trackCarbs: true, trackFat: true }),
+                    calorieTarget: Number(nutritionCustom.calories) || (base?.calorieTarget ?? 2000),
+                    proteinGrams: Number(nutritionCustom.protein) || (base?.proteinGrams ?? 150),
+                    carbsGrams: Number(nutritionCustom.carbs) || (base?.carbsGrams ?? 200),
+                    fatGrams: Number(nutritionCustom.fat) || (base?.fatGrams ?? 65),
+                    isCustom: true,
+                    calculatedTDEE: base?.calculatedTDEE,
+                    enabled: existing?.enabled ?? true,
+                  } as NutritionSettings);
+                } else if (base) {
+                  const merged: NutritionSettings = {
+                    ...(existing ?? {}),
+                    ...base,
+                    id: activeUserId,
+                    userId: activeUserId,
+                    enabled: existing?.enabled ?? true,
+                    trackProtein: existing?.trackProtein ?? true,
+                    trackCarbs: existing?.trackCarbs ?? true,
+                    trackFat: existing?.trackFat ?? true,
+                    isCustom: false,
+                  };
+                  await db.nutritionSettings.put(merged);
+                }
+                setNutritionCustom(null);
+              }}
+              style={{ alignSelf: "flex-start" }}
+            >
+              Save Nutrition Settings
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Custom Exercises */}

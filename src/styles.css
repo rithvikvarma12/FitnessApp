@@ -1285,3 +1285,195 @@ body,
   gap: 10px;
   justify-content: flex-end;
 }
+
+/* ── Bottom Nav: 5-item compact ─────────────────────────────────────────── */
+.bottom-nav--five .bottom-nav-item {
+  padding: 6px 10px;
+  font-size: 9px;
+}
+
+.bottom-nav--five .bottom-nav-item svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Nutrition Page ──────────────────────────────────────────────────────── */
+.nutri-page {
+  display: grid;
+  gap: 12px;
+}
+
+/* Date navigation */
+.nutri-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+}
+
+/* Progress rings row */
+.nutri-rings-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.nutri-ring-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 72px;
+  min-width: 72px;
+}
+
+.nutri-ring-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Macro bars */
+.nutri-macro-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.nutri-macro-row {
+  display: grid;
+  gap: 5px;
+}
+
+.nutri-macro-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nutri-macro-nums {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.nutri-macro-track {
+  height: 6px;
+  background: var(--bg-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-glass);
+}
+
+.nutri-macro-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+/* Section title */
+.nutri-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* Log card */
+.nutri-log-card {
+  display: grid;
+  gap: 10px;
+}
+
+.nutri-field-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+/* Weekly card */
+.nutri-weekly-card {
+  display: grid;
+  gap: 12px;
+}
+
+/* ── Nutrition Plan Card (PlanPage) ──────────────────────────────────────── */
+.nutri-plan-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.nutri-plan-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nutri-plan-numbers {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--font-mono);
+}
+
+.nutri-plan-current {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.nutri-plan-sep {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 2px;
+}
+
+.nutri-plan-target {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.nutri-plan-bar-track {
+  height: 4px;
+  background: var(--bg-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-glass);
+}
+
+.nutri-plan-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-green);
+  transition: width 0.4s ease;
+}
+
+/* ── Nutrition Adherence Card (ProgressPage) ─────────────────────────────── */
+.nutri-adherence-card {
+  display: grid;
+  gap: 10px;
+}

@@ -19,6 +19,38 @@ export type UserProfile = {
   cardioMinutesPerSession: number;
   notes?: string;
   createdAtISO: string;
+  // nutrition body stats (optional — added in v0.8)
+  heightCm?: number;
+  age?: number;
+  gender?: "male" | "female";
+  activityMultiplier?: number;
+};
+
+export type NutritionSettings = {
+  id: string;           // same as userId
+  userId: string;
+  enabled: boolean;
+  calorieTarget: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  trackProtein: boolean;
+  trackCarbs: boolean;
+  trackFat: boolean;
+  isCustom: boolean;
+  calculatedTDEE?: number;
+};
+
+export type DailyNutritionLog = {
+  id: string;           // `${userId}-${dateISO}`
+  userId: string;
+  dateISO: string;      // YYYY-MM-DD
+  calories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  hitTarget: boolean;
+  notes?: string;
 };
 
 export type ExerciseTemplate = {

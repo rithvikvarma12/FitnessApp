@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { subDays, format as fmtDate } from "date-fns";
 import { db, getActiveUserId } from "../db/db";
-import type { WeekPlan } from "../db/types";
+import type { WeekPlan, DailyNutritionLog } from "../db/types";
 import type { Unit } from "../services/units";
 import { toDisplay } from "../services/units";
 import { computeProgressSnapshot } from "../services/progressTracker";
@@ -224,6 +225,19 @@ export default function ProgressPage() {
     return (s?.value ?? "dark") as "dark" | "light";
   }, [], "dark" as "dark" | "light");
 
+  const nutritionSettings = useLiveQuery(
+    async () => activeUserId ? db.nutritionSettings.get(activeUserId) : undefined,
+    [activeUserId]
+  );
+  const nutritionLogs = useLiveQuery(
+    async () => {
+      if (!activeUserId) return [] as DailyNutritionLog[];
+      return db.dailyNutritionLogs.where("userId").equals(activeUserId).toArray();
+    },
+    [activeUserId],
+    [] as DailyNutritionLog[]
+  );
+
   const snapshot = useMemo(
     () => (weeks && weeks.length > 0 ? computeProgressSnapshot(weeks) : null),
     [weeks]
@@ -318,6 +332,43 @@ export default function ProgressPage() {
 
       {/* Muscle group breakdown */}
       <MuscleGroupBreakdown groups={muscleGroupVolumes} unit={unit} />
+
+      {/* Nutrition adherence */}
+      {nutritionSettings?.enabled && nutritionLogs.length > 0 && (() => {
+        const target = nutritionSettings.calorieTarget;
+        const last28: Array<{ dateISO: string; calories: number; onTarget: boolean }> = [];
+        for (let i = 27; i >= 0; i--) {
+          const d = fmtDate(subDays(new Date(), i), "yyyy-MM-dd");
+          const entry = nutritionLogs.find((l) => l.dateISO === d);
+          const cal = entry?.calories ?? 0;
+          const pct = target > 0 ? cal / target : 0;
+          last28.push({ dateISO: d, calories: cal, onTarget: pct >= 0.9 && pct <= 1.1 });
+        }
+        const thisWeek7 = last28.slice(-7);
+        const daysOnTarget = thisWeek7.filter((d) => d.onTarget).length;
+        const logged = last28.filter((d) => d.calories > 0);
+        const avgCalories = logged.length > 0 ? Math.round(logged.reduce((s, d) => s + d.calories, 0) / logged.length) : 0;
+        return (
+          <div className="card nutri-adherence-card">
+            <div className="progress-section-title">Nutrition Adherence</div>
+            <div className="row" style={{ gap: 10, marginBottom: 12 }}>
+              <div className="stat-box"><div className="stat-box-label">This Week On Target</div><div className="stat-box-value">{daysOnTarget}/7</div></div>
+              <div className="stat-box"><div className="stat-box-label">4-Week Avg Calories</div><div className="stat-box-value">{avgCalories || "—"}</div></div>
+              <div className="stat-box"><div className="stat-box-label">Adherence</div><div className="stat-box-value">{Math.round((daysOnTarget / 7) * 100)}%</div></div>
+            </div>
+            <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 40 }}>
+              {last28.slice(-14).map((d) => {
+                const pct = target > 0 ? Math.min(d.calories / target, 1.3) : 0;
+                const color = d.onTarget ? "#10b981" : d.calories > 0 ? "#3b82f6" : "var(--border-subtle)";
+                return (
+                  <div key={d.dateISO} title={`${d.dateISO}: ${d.calories} kcal`} style={{ flex: 1, height: `${Math.max(pct * 100, 4)}%`, background: color, borderRadius: 2, minHeight: 2 }} />
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>Last 14 days vs target</div>
+          </div>
+        );
+      })()}
 
       {/* All-time PR board */}
       {sortedPRs.length > 0 && (

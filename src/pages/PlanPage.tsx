@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { format, parseISO } from "date-fns";
 import { db, getActiveUserId } from "../db/db";
 import type { WeekPlan } from "../db/types";
 import type { Unit } from "../services/units";
 import { toDisplay } from "../services/units";
 import { createFirstWeekIfMissing, generateNextWeek, getLatestWeek } from "../services/planGenerator";
-import { format, parseISO } from "date-fns";
 import WeekView from "./WeekView";
 import { initRithvikPresetWeek6 } from "../services/presets";
 import GoalReachedBanner from "../components/GoalReachedBanner";
@@ -40,6 +40,19 @@ export default function PlanPage() {
     },
     [activeUserId],
     []
+  );
+
+  const nutritionSettings = useLiveQuery(
+    async () => activeUserId ? db.nutritionSettings.get(activeUserId) : undefined,
+    [activeUserId]
+  );
+  const todayNutritionLog = useLiveQuery(
+    async () => {
+      if (!activeUserId) return undefined;
+      const todayISO = format(new Date(), "yyyy-MM-dd");
+      return db.dailyNutritionLogs.get(`${activeUserId}-${todayISO}`);
+    },
+    [activeUserId]
   );
 
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
@@ -238,6 +251,30 @@ export default function PlanPage() {
           <div className="stat-box-value" style={{ color: "var(--accent-green)" }}>{progressSummary.trendLabel}</div>
         </div>
       </div>
+
+      {/* Nutrition summary card */}
+      {nutritionSettings?.enabled && (
+        <div className="nutri-plan-card">
+          <div className="nutri-plan-label">Calories today</div>
+          <div className="nutri-plan-numbers">
+            <span className="nutri-plan-current">{todayNutritionLog?.calories ?? 0}</span>
+            <span className="nutri-plan-sep"> / </span>
+            <span className="nutri-plan-target">{nutritionSettings.calorieTarget} kcal</span>
+          </div>
+          <div className="nutri-plan-bar-track">
+            <div
+              className="nutri-plan-bar-fill"
+              style={{
+                width: `${Math.min(((todayNutritionLog?.calories ?? 0) / nutritionSettings.calorieTarget) * 100, 100)}%`,
+                background: (() => {
+                  const pct = (todayNutritionLog?.calories ?? 0) / nutritionSettings.calorieTarget;
+                  return pct >= 0.9 && pct <= 1.1 ? "#10b981" : pct > 1.1 ? "#f97316" : "#3b82f6";
+                })(),
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {selected && cardioSummary && (
         <>
