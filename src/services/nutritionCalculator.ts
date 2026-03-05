@@ -1,4 +1,5 @@
 import type { UserProfile, NutritionSettings } from "../db/types";
+import { db } from "../db/db";
 
 // ─── Activity Multiplier Defaults ────────────────────────────────────────────
 
@@ -82,4 +83,40 @@ export function generateNutritionSettings(
     isCustom: false,
     calculatedTDEE: tdee,
   };
+}
+
+// ─── Auto-recalculate helper ──────────────────────────────────────────────────
+// Silently recalculates nutrition settings when isCustom=false.
+// Skips if settings don't exist, are custom, or body stats are missing.
+export async function recalculateNutritionIfAuto(
+  userId: string,
+  options?: { goalMode?: "cut" | "maintain" | "bulk"; weightKg?: number }
+): Promise<void> {
+  const [ns, profile] = await Promise.all([
+    db.nutritionSettings.get(userId),
+    db.userProfiles.get(userId),
+  ]);
+  if (!ns || ns.isCustom || !profile) return;
+
+  const goalMode = options?.goalMode ?? profile.goalMode;
+
+  let weightKg = options?.weightKg;
+  if (!weightKg) {
+    const entries = await db.weightEntries.where("userId").equals(userId).toArray();
+    entries.sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+    weightKg = entries[0]?.weightKg ?? profile.currentWeightKg;
+  }
+  if (!weightKg) return;
+
+  const recalc = generateNutritionSettings({ ...profile, goalMode }, weightKg);
+  if (!recalc) return;
+
+  await db.nutritionSettings.put({
+    ...recalc,
+    enabled: ns.enabled,
+    trackProtein: ns.trackProtein,
+    trackCarbs: ns.trackCarbs,
+    trackFat: ns.trackFat,
+    isCustom: false,
+  });
 }

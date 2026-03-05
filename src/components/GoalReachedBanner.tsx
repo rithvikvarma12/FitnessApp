@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/db";
 import type { Unit } from "../services/units";
 import { fromDisplay, toDisplay } from "../services/units";
+import { recalculateNutritionIfAuto } from "../services/nutritionCalculator";
 
 type GoalMode = "cut" | "maintain" | "bulk";
 
@@ -74,24 +75,25 @@ export default function GoalReachedBanner({
       goal: goal === "bulk" ? "gain" : goal,
       targetWeightKg: targetKg
     });
+    void recalculateNutritionIfAuto(userId, { goalMode: goal, weightKg: latestWeightKg });
     setEditorMode(null);
     setTargetInput("");
   };
 
   const switchToMaintain = async () => {
-    await db.userProfiles.update(userId, { goalMode: "maintain", goal: "maintain" });
+    await db.userProfiles.update(userId, {
+      goalMode: "maintain",
+      goal: "maintain",
+      targetWeightKg: latestWeightKg
+    });
+    void recalculateNutritionIfAuto(userId, { goalMode: "maintain", weightKg: latestWeightKg });
     setEditorMode(null);
   };
 
-  const switchToBulk = async () => {
-    if (typeof targetWeightKg === "number") {
-      await db.userProfiles.update(userId, { goalMode: "bulk", goal: "gain" });
-      setEditorMode(null);
-      return;
-    }
+  const switchToBulk = () => {
     const suggestedKg =
       typeof latestWeightKg === "number"
-        ? latestWeightKg + 2
+        ? latestWeightKg + 7
         : 80;
     setTargetInput(toDisplay(suggestedKg, unit).toFixed(1));
     setEditorMode("bulk");
@@ -125,7 +127,7 @@ export default function GoalReachedBanner({
         <button type="button" className="secondary" onClick={() => void switchToMaintain()}>
           Switch to Maintain
         </button>
-        <button type="button" className="secondary" onClick={() => void switchToBulk()}>
+        <button type="button" className="secondary" onClick={switchToBulk}>
           Switch to Bulk
         </button>
         <button type="button" className="secondary" onClick={startContinue}>

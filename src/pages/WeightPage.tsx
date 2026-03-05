@@ -18,6 +18,7 @@ import {
 } from "chart.js";
 import { movingAverage } from "../services/stats";
 import GoalReachedBanner from "../components/GoalReachedBanner";
+import { recalculateNutritionIfAuto } from "../services/nutritionCalculator";
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 
@@ -178,6 +179,9 @@ export default function WeightPage() {
         createdAtISO
       });
     }
+
+    // Silently recalculate nutrition targets (TDEE changes as weight changes)
+    void recalculateNutritionIfAuto(currentUserId, { weightKg: wKg });
 
     setNewWeight("");
   };

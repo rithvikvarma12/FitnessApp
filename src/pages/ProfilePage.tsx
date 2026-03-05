@@ -4,7 +4,7 @@ import { db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
 import { fromDisplay, toDisplay } from "../services/units";
 import type { CustomExercise, ExerciseTemplate, NutritionSettings } from "../db/types";
-import { generateNutritionSettings, defaultActivityMultiplier } from "../services/nutritionCalculator";
+import { generateNutritionSettings, defaultActivityMultiplier, recalculateNutritionIfAuto } from "../services/nutritionCalculator";
 
 type GoalMode = "cut" | "maintain" | "bulk";
 type Equipment = "gym" | "home" | "minimal";
@@ -128,6 +128,7 @@ export default function ProfilePage() {
     setBusy(true);
     setMsg(null);
     try {
+      const prevGoalMode = resolveGoalMode(profile);
       const targetRaw = Number(form.targetWeight);
       const targetWeightKg = Number.isFinite(targetRaw) ? fromDisplay(targetRaw, unit) : undefined;
       await db.userProfiles.update(activeUserId, {
@@ -137,6 +138,19 @@ export default function ProfilePage() {
         daysPerWeek: form.daysPerWeek,
         equipment: form.equipment
       });
+
+      // Recalculate nutrition if goal mode changed
+      if (form.goalMode !== prevGoalMode && nutritionSettings) {
+        if (!nutritionSettings.isCustom) {
+          void recalculateNutritionIfAuto(activeUserId, { goalMode: form.goalMode });
+        } else {
+          const ok = window.confirm(
+            `You have custom nutrition targets. Recalculate them for "${form.goalMode}" mode?`
+          );
+          if (ok) void recalculateNutritionIfAuto(activeUserId, { goalMode: form.goalMode });
+        }
+      }
+
       setMsg("Profile updated.");
     } catch (e: any) {
       setMsg(e?.message ?? "Could not save profile.");

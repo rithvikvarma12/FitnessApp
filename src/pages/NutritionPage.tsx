@@ -25,10 +25,12 @@ function progressColor(pct: number): string {
   return "#3b82f6";
 }
 
-interface RingProps { value: number; target: number; label: string; unit?: string; }
+interface RingProps { value: number; target: number; label: string; unit?: string; hitTarget?: boolean; }
 
-function ProgressRing({ value, target, label, unit = "" }: RingProps) {
-  const pct = target > 0 ? value / target : 0;
+function ProgressRing({ value, target, label, unit = "", hitTarget = false }: RingProps) {
+  // When hitTarget is set and no actual value logged, treat as 100% qualitative
+  const effectiveValue = (hitTarget && value === 0) ? target : value;
+  const pct = target > 0 ? effectiveValue / target : 0;
   const color = progressColor(pct);
   const r = 28;
   const circumference = 2 * Math.PI * r;
@@ -48,8 +50,13 @@ function ProgressRing({ value, target, label, unit = "" }: RingProps) {
           strokeDashoffset={circumference / 4}
           style={{ transition: "stroke-dasharray 0.4s ease" }}
         />
-        <text x={36} y={33} textAnchor="middle" fill="var(--text-primary)" fontSize={13} fontWeight={700} fontFamily="var(--font-mono)">{Math.round(value)}</text>
-        <text x={36} y={46} textAnchor="middle" fill="var(--text-muted)" fontSize={9} fontFamily="var(--font-body)">/ {Math.round(target)}</text>
+        {hitTarget && value === 0
+          ? <text x={36} y={39} textAnchor="middle" fill={color} fontSize={16} fontWeight={700}>✓</text>
+          : <>
+              <text x={36} y={33} textAnchor="middle" fill="var(--text-primary)" fontSize={13} fontWeight={700} fontFamily="var(--font-mono)">{Math.round(value)}</text>
+              <text x={36} y={46} textAnchor="middle" fill="var(--text-muted)" fontSize={9} fontFamily="var(--font-body)">/ {Math.round(target)}</text>
+            </>
+        }
       </svg>
       <div className="nutri-ring-label">{label}{unit ? ` (${unit})` : ""}</div>
     </div>
@@ -268,11 +275,17 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
 
       {/* Target cards */}
       <div className="nutri-rings-row">
-        <ProgressRing value={log?.calories ?? 0} target={settings.calorieTarget} label="Calories" unit="kcal" />
-        {settings.trackProtein && <ProgressRing value={log?.proteinGrams ?? 0} target={settings.proteinGrams} label="Protein" unit="g" />}
-        {settings.trackCarbs && <ProgressRing value={log?.carbsGrams ?? 0} target={settings.carbsGrams} label="Carbs" unit="g" />}
-        {settings.trackFat && <ProgressRing value={log?.fatGrams ?? 0} target={settings.fatGrams} label="Fat" unit="g" />}
+        <ProgressRing value={log?.calories ?? 0} target={settings.calorieTarget} label="Calories" unit="kcal" hitTarget={hitTarget} />
+        {settings.trackProtein && <ProgressRing value={log?.proteinGrams ?? 0} target={settings.proteinGrams} label="Protein" unit="g" hitTarget={hitTarget} />}
+        {settings.trackCarbs && <ProgressRing value={log?.carbsGrams ?? 0} target={settings.carbsGrams} label="Carbs" unit="g" hitTarget={hitTarget} />}
+        {settings.trackFat && <ProgressRing value={log?.fatGrams ?? 0} target={settings.fatGrams} label="Fat" unit="g" hitTarget={hitTarget} />}
       </div>
+
+      {!settings.isCustom && (
+        <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: -4 }}>
+          Targets auto-adjust as your weight changes
+        </div>
+      )}
 
       {/* Macro bars */}
       {(settings.trackProtein || settings.trackCarbs || settings.trackFat) && (
@@ -314,7 +327,29 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, cursor: "pointer" }}>
-            <input type="checkbox" checked={hitTarget} onChange={(e) => setHitTarget(e.target.checked)} style={{ width: 16, height: 16 }} />
+            <input
+              type="checkbox"
+              checked={hitTarget}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setHitTarget(checked);
+                if (!activeUserId) return;
+                // Auto-save immediately so state persists on navigation
+                const entry: DailyNutritionLog = {
+                  id: `${activeUserId}-${viewDate}`,
+                  userId: activeUserId,
+                  dateISO: viewDate,
+                  calories: Number(calories) || 0,
+                  proteinGrams: Number(protein) || 0,
+                  carbsGrams: Number(carbs) || 0,
+                  fatGrams: Number(fat) || 0,
+                  hitTarget: checked,
+                  notes: notes.trim() || undefined,
+                };
+                await db.dailyNutritionLogs.put(entry);
+              }}
+              style={{ width: 16, height: 16 }}
+            />
             Hit target today
           </label>
         </div>
