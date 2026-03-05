@@ -12,6 +12,8 @@ import type {
   MuscleGroupVolume,
 } from "../services/progressTracker";
 import PRCelebration from "../components/PRCelebration";
+import MuscleMap from "../components/MuscleMap";
+import { PROGRESS_GROUP_TO_MUSCLES } from "../services/muscleMapping";
 import {
   Chart as ChartJS,
   BarElement,
@@ -153,9 +155,21 @@ function MuscleGroupBreakdown({ groups, unit }: MuscleGroupBreakdownProps) {
   if (groups.length === 0) return null;
   const maxVol = Math.max(...groups.map((g) => g.totalVolumeKg), 1);
 
+  // Build primary/secondary muscle IDs from volume ranking
+  const sorted = [...groups].sort((a, b) => b.totalVolumeKg - a.totalVolumeKg);
+  const midpoint = Math.ceil(sorted.length / 2);
+  const coveragePrimary = sorted.slice(0, midpoint).flatMap((g) => PROGRESS_GROUP_TO_MUSCLES[g.group] ?? []);
+  const coverageSecondary = sorted.slice(midpoint).flatMap((g) => PROGRESS_GROUP_TO_MUSCLES[g.group] ?? []);
+
   return (
     <div className="progress-muscle-card">
       <div className="progress-section-title">Muscle Group Breakdown</div>
+      <div style={{ marginBottom: 12 }}>
+        <MuscleMap primaryMuscles={coveragePrimary} secondaryMuscles={coverageSecondary} size={160} />
+        <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 6 }}>
+          Coverage — last 4 weeks · red = most trained
+        </div>
+      </div>
       <div className="progress-muscle-list">
         {groups.map((g) => {
           const pct = (g.totalVolumeKg / maxVol) * 100;

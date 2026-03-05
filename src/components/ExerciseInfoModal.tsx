@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { classifyCompound } from "../db/db";
 import type { ExerciseMeta } from "../db/types";
+import MuscleMap from "./MuscleMap";
+import { getMuscleTargets } from "../services/muscleMapping";
 
 interface ExerciseInfoModalProps {
   exerciseName: string | null;
@@ -31,7 +33,9 @@ export default function ExerciseInfoModal({
   const resolvedType = meta?.type ?? classifyCompound(exerciseName);
   const primaryMuscles = meta?.primaryMuscles ?? [];
   const secondaryMuscles = meta?.secondaryMuscles ?? [];
-  const targetedMuscles = [...primaryMuscles, ...secondaryMuscles];
+
+  // Muscle map targets via keyword matching; fallback to custom muscleGroup if set
+  const muscleTargets = getMuscleTargets(exerciseName, meta?.primaryMuscles[0]);
 
   return (
     <div
@@ -72,23 +76,30 @@ export default function ExerciseInfoModal({
           </div>
         </div>
 
-        {meta?.imageUrl ? (
-          <img className="exerciseInfoImage" src={meta.imageUrl} alt={`${exerciseName} reference`} />
-        ) : (
-          <div className="card exerciseInfoImagePlaceholder">
-            <div className="small muted">No image added yet</div>
-            <div className="small">Targeted muscles</div>
-            <div className="muscleChipRow">
-              {targetedMuscles.length ? (
-                targetedMuscles.map((muscle) => (
-                  <span key={`target-${muscle}`} className="muscleChip secondaryMuscleChip">{muscle}</span>
-                ))
-              ) : (
-                <span className="small muted">Not set</span>
+        <div className="card exerciseInfoImagePlaceholder" style={{ paddingTop: 14, paddingBottom: 14 }}>
+          <MuscleMap
+            primaryMuscles={muscleTargets.primary}
+            secondaryMuscles={muscleTargets.secondary}
+            size={180}
+          />
+          {(muscleTargets.primary.length > 0 || muscleTargets.secondary.length > 0) && (
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 8, flexWrap: "wrap" }}>
+              {muscleTargets.primary.length > 0 && (
+                <span style={{ fontSize: 10, color: "#ef4444" }}>
+                  ● Primary: {muscleTargets.primary.join(", ").replace(/_/g, " ")}
+                </span>
+              )}
+              {muscleTargets.secondary.length > 0 && (
+                <span style={{ fontSize: 10, color: "#f97316" }}>
+                  ● Secondary: {muscleTargets.secondary.join(", ").replace(/_/g, " ")}
+                </span>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        {meta?.imageUrl ? (
+          <img className="exerciseInfoImage" src={meta.imageUrl} alt={`${exerciseName} reference`} />
+        ) : null}
 
         <div className="exerciseInfoGrid">
           <div className="card exerciseInfoSection">
