@@ -22,7 +22,7 @@ export default function GoalReachedBanner({
   unit: Unit;
 }) {
   const [targetInput, setTargetInput] = useState("");
-  const [editorMode, setEditorMode] = useState<null | "continue" | "bulk">(null);
+  const [editorMode, setEditorMode] = useState<null | "continue" | "bulk" | "cut">(null);
 
   const profileAndLatest = useLiveQuery(async () => {
     if (!userId) return undefined;
@@ -91,12 +91,15 @@ export default function GoalReachedBanner({
   };
 
   const switchToBulk = () => {
-    const suggestedKg =
-      typeof latestWeightKg === "number"
-        ? latestWeightKg + 7
-        : 80;
+    const suggestedKg = typeof latestWeightKg === "number" ? latestWeightKg + 7 : 80;
     setTargetInput(toDisplay(suggestedKg, unit).toFixed(1));
     setEditorMode("bulk");
+  };
+
+  const switchToCut = () => {
+    const suggestedKg = typeof latestWeightKg === "number" ? latestWeightKg - 7 : 75;
+    setTargetInput(toDisplay(suggestedKg, unit).toFixed(1));
+    setEditorMode("cut");
   };
 
   const startContinue = () => {
@@ -124,12 +127,21 @@ export default function GoalReachedBanner({
       </div>
 
       <div className="row" style={{ marginTop: 10, gap: 8 }}>
-        <button type="button" className="secondary" onClick={() => void switchToMaintain()}>
-          Switch to Maintain
-        </button>
-        <button type="button" className="secondary" onClick={switchToBulk}>
-          Switch to Bulk
-        </button>
+        {goalMode !== "maintain" && (
+          <button type="button" className="secondary" onClick={() => void switchToMaintain()}>
+            Switch to Maintain
+          </button>
+        )}
+        {goalMode !== "bulk" && (
+          <button type="button" className="secondary" onClick={switchToBulk}>
+            Switch to Bulk
+          </button>
+        )}
+        {goalMode !== "cut" && (
+          <button type="button" className="secondary" onClick={switchToCut}>
+            Switch to Cut
+          </button>
+        )}
         <button type="button" className="secondary" onClick={startContinue}>
           Continue (set new goal)
         </button>
@@ -148,7 +160,7 @@ export default function GoalReachedBanner({
           </div>
           <button
             type="button"
-            onClick={() => void saveTarget(editorMode === "bulk" ? "bulk" : undefined)}
+            onClick={() => void saveTarget(editorMode === "bulk" ? "bulk" : editorMode === "cut" ? "cut" : undefined)}
           >
             Save
           </button>
