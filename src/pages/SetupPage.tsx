@@ -3,12 +3,12 @@ import { db } from "../db/db";
 import type { UserProfile } from "../db/types";
 import { ensureSeedData } from "../db/seed";
 import { createFirstWeekIfMissing } from "../services/planGenerator";
-import { initDemoPresetForUser, initRithvikPresetWeek6ForUser } from "../services/presets";
+import { initDemoPresetForUser } from "../services/presets";
 import { deriveAutoCardio, defaultCardioTypeForGoal } from "../services/cardio";
 import { fromDisplay, toDisplay } from "../services/units";
 import { generateNutritionSettings, defaultActivityMultiplier } from "../services/nutritionCalculator";
 
-type PresetKey = "generic" | "rithvik" | "demo";
+type PresetKey = "generic" | "demo";
 
 type FormState = {
   name: string;
@@ -56,20 +56,6 @@ const baseGeneric = withAutoCardio({
   gender: "male",
 });
 
-const baseRithvik = withAutoCardio({
-  name: "Rithvik",
-  unit: "kg",
-  daysPerWeek: 5,
-  goalMode: "cut",
-  currentWeight: "80",
-  targetWeight: "72",
-  experience: "intermediate",
-  equipment: "gym",
-  notes: "Rithvik preset onboarding",
-  heightCm: "180",
-  age: "22",
-  gender: "male",
-});
 
 const baseDemo = withAutoCardio({
   name: "Demo Profile",
@@ -87,7 +73,6 @@ const baseDemo = withAutoCardio({
 });
 
 function presetDefaults(preset: PresetKey): FormState {
-  if (preset === "rithvik") return { ...baseRithvik };
   if (preset === "demo") return { ...baseDemo };
   return { ...baseGeneric };
 }
@@ -95,7 +80,6 @@ function presetDefaults(preset: PresetKey): FormState {
 interface SetupPageProps { onDone?: () => void; }
 export default function SetupPage({ onDone }: SetupPageProps = {}) {
   const [preset, setPreset] = useState<PresetKey>("generic");
-  const [startRithvikWeek6, setStartRithvikWeek6] = useState(true);
   const [form, setForm] = useState<FormState>(presetDefaults("generic"));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -164,11 +148,7 @@ export default function SetupPage({ onDone }: SetupPageProps = {}) {
         id: crypto.randomUUID(),
         name:
           form.name.trim() ||
-          (preset === "rithvik"
-            ? "Rithvik preset"
-            : preset === "demo"
-              ? "Demo profile"
-              : "Default"),
+          (preset === "demo" ? "Demo profile" : "Default"),
         unit: form.unit,
         daysPerWeek: form.daysPerWeek,
         goalMode: form.goalMode,
@@ -209,13 +189,7 @@ export default function SetupPage({ onDone }: SetupPageProps = {}) {
       });
       await ensureSeedData();
 
-      if (preset === "rithvik") {
-        if (startRithvikWeek6) {
-          await initRithvikPresetWeek6ForUser(profile.id);
-        } else {
-          await createFirstWeekIfMissing({ userId: profile.id, weekNumber: 1 });
-        }
-      } else if (preset === "demo") {
+      if (preset === "demo") {
         await initDemoPresetForUser(profile.id);
       } else {
         await createFirstWeekIfMissing({ userId: profile.id, weekNumber: 1 });
@@ -244,9 +218,8 @@ export default function SetupPage({ onDone }: SetupPageProps = {}) {
         <div className="col">
           {fl("Preset")}
           <select value={preset} onChange={(e) => handlePresetChange(e.target.value as PresetKey)}>
-            <option value="generic">Generic gym</option>
-            <option value="rithvik">Rithvik preset</option>
-            <option value="demo">Demo (sample data)</option>
+            <option value="generic">Start Fresh</option>
+            <option value="demo">Demo</option>
           </select>
         </div>
 
@@ -260,17 +233,6 @@ export default function SetupPage({ onDone }: SetupPageProps = {}) {
         </div>
       </div>
 
-      {preset === "rithvik" && (
-        <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={startRithvikWeek6}
-            onChange={(e) => setStartRithvikWeek6(e.target.checked)}
-            style={{ width: 16, height: 16, flexShrink: 0 }}
-          />
-          Start at Week 6 (Rithvik preset, current Monday)
-        </label>
-      )}
 
       <hr />
 

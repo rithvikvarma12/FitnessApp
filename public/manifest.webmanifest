@@ -1,6 +1,6 @@
 {
-  "name": "Cut/Gym Plan",
-  "short_name": "CutGym",
+  "name": "TrainLab",
+  "short_name": "TrainLab",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",

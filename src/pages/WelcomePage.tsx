@@ -56,7 +56,7 @@ export default function WelcomePage({ profiles, onSelectProfile, onCreateNew }: 
         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         backgroundClip: "text", marginBottom: 6,
       }}>
-        CutGym
+        TrainLab
       </div>
 
       {/* Tagline */}
