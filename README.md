@@ -4,7 +4,7 @@ A Progressive Web App built with React + TypeScript + Vite + Dexie (IndexedDB) t
 
 ## Current Version
 
-v0.8.0 — Nutrition & Exercise Visualization
+v0.9.0 — Adaptive Engine
 
 ## Features
 
@@ -13,6 +13,30 @@ v0.8.0 — Nutrition & Exercise Visualization
 - Auto-progression: weight and rep targets advance week over week using e1RM
 - End Week Early flow with freeform notes to guide next week's generation
 - Exercise swap system with equipment-compatible alternatives
+
+### Adaptive Engine (v0.9)
+- **Structured note chips** — 7 chip types attached to any week to guide next-week generation:
+  - *Deload week* — reduces all working sets by 1 and loads by 12.5%
+  - *Fatigued* — drops one accessory exercise or trims a set from the most fatiguing movement
+  - *Traveling* — overrides training days and available equipment for that week
+  - *Injury/Pain* — records affected area and severity; exercises that stress the area are excluded or substituted
+  - *Focus on...* — adds an extra set to exercises targeting the selected muscle group
+  - *Only N days* — overrides the training day count for the generated week
+  - *Equipment change* — switches equipment profile for one week or until manually changed back
+- Chips with follow-up forms only commit when all required fields are filled (no partial saves)
+- **Post-session fatigue rating** — 1–5 star rating logged after each completed workout
+- **Auto-deload intelligence** — suggests a deload week when any of the following signals are detected:
+  - Average fatigue rating ≤ 2.0 over the last two weeks
+  - Session completion rate below 60% for two consecutive weeks
+  - Volume ramped 15%+ or more across three straight weeks
+  - Six or more weeks since the last deload
+- **Injury/limitation memory** — active injuries are persisted across weeks:
+  - Logged via the Injury/Pain chip (area + severity)
+  - Checked in every two weeks: Still painful / Getting better / Fully recovered
+  - Severity automatically downgrades on improvement; injury is removed on recovery
+  - Exercise exclusions and substitutions applied automatically when generating plans
+  - Injury snapshot stored per generated week so history accurately reflects what was in effect
+- **Adaptive plan summary** — each generated week shows a bullet list of every adjustment made (set reductions, exercise swaps, focus boosts, equipment overrides, injury workarounds)
 
 ### Goal Modes
 - **Cut** – reduced accessory volume, higher cardio frequency
@@ -88,6 +112,7 @@ npm run build   # production build
 
 | Version | Highlights |
 |---|---|
+| v0.9 | Adaptive engine: structured note chips (7 types), post-session fatigue rating, auto-deload detection, injury/limitation memory with check-ins, adaptive plan summary |
 | v0.8 | Nutrition system (TDEE, macros, daily logging, adherence), SVG muscle map, goal switching improvements |
 | v0.7 | UI overhaul (dark athletic theme, bottom nav, glass cards), progress dashboard, PR tracking, rest timer, workout duration, session summary, custom exercises, light/dark theme, code refactor |
 | v0.5 | Goal↔weight sync, goal-reached banner, exercise history charts, data export/import |
