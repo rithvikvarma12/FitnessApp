@@ -3,13 +3,6 @@ import { supabase } from "./supabase";
 export async function signUp(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
-  // Create the remote profile row keyed by Supabase auth user id
-  if (data.user) {
-    const { error: profileError } = await supabase
-      .from("user_profiles")
-      .insert({ auth_id: data.user.id });
-    if (profileError) throw profileError;
-  }
   return data;
 }
 

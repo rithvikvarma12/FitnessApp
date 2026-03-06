@@ -128,8 +128,19 @@ export default function App() {
       .select("*")
       .eq("auth_id", session.user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        setSupabaseProfile(data ?? null);
+      .then(async ({ data, error }) => {
+        if (error) console.error('Supabase profile error:', error);
+        if (data) {
+          setSupabaseProfile(data);
+        } else {
+          // First sign-in for this account — create the remote profile row
+          const { data: inserted } = await supabase
+            .from("user_profiles")
+            .insert({ id: crypto.randomUUID(), auth_id: session.user.id })
+            .select()
+            .single();
+          setSupabaseProfile(inserted ?? null);
+        }
       });
   }, [session]);
 

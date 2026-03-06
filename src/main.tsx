@@ -5,7 +5,7 @@ import "./styles.css";
 import "./progress.css";
 import { registerServiceWorker } from "./pwa/registerSW";
 
-registerServiceWorker();
+if (import.meta.env.PROD) { registerServiceWorker(); }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
