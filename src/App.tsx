@@ -71,6 +71,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [supabaseProfile, setSupabaseProfile] = useState<Record<string, unknown> | null | undefined>(undefined);
 
   const profiles = useLiveQuery(
     async () => db.userProfiles.orderBy("createdAtISO").toArray(),
@@ -114,6 +115,23 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (session === undefined) return;
+    if (!session) {
+      setSupabaseProfile(null);
+      return;
+    }
+    setSupabaseProfile(undefined);
+    supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("auth_id", session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setSupabaseProfile(data ?? null);
+      });
+  }, [session]);
 
   const setUnitForActiveProfile = async (nextUnit: Unit) => {
     await db.settings.put({ key: "unit", value: nextUnit });
@@ -159,6 +177,21 @@ export default function App() {
           <div className="ambient-blob ambient-blob--purple" />
         </div>
         <AuthPage onAuth={() => {}} />
+      </>
+    );
+  }
+
+  // Still fetching the Supabase profile for this session
+  if (supabaseProfile === undefined) {
+    return (
+      <>
+        <div className="ambient-bg">
+          <div className="ambient-blob ambient-blob--blue" />
+          <div className="ambient-blob ambient-blob--purple" />
+        </div>
+        <div className="container">
+          <div className="card">Loading…</div>
+        </div>
       </>
     );
   }
