@@ -12,6 +12,9 @@ import WeightPage from "./pages/WeightPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProgressPage from "./pages/ProgressPage";
 import NutritionPage from "./pages/NutritionPage";
+import AuthPage from "./pages/AuthPage";
+import { supabase } from "./lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 type Tab = "plan" | "weight" | "progress" | "nutrition" | "profile";
 
@@ -67,6 +70,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("plan");
   const [ready, setReady] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   const profiles = useLiveQuery(
     async () => db.userProfiles.orderBy("createdAtISO").toArray(),
@@ -99,6 +103,16 @@ export default function App() {
       // await createFirstWeekIfMissing();
       setReady(true);
     })();
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const setUnitForActiveProfile = async (nextUnit: Unit) => {
@@ -118,6 +132,33 @@ export default function App() {
         <div className="container">
           <div className="card">Loading…</div>
         </div>
+      </>
+    );
+  }
+
+  // session === undefined means still loading; null means logged out
+  if (session === undefined) {
+    return (
+      <>
+        <div className="ambient-bg">
+          <div className="ambient-blob ambient-blob--blue" />
+          <div className="ambient-blob ambient-blob--purple" />
+        </div>
+        <div className="container">
+          <div className="card">Loading…</div>
+        </div>
+      </>
+    );
+  }
+
+  if (session === null) {
+    return (
+      <>
+        <div className="ambient-bg">
+          <div className="ambient-blob ambient-blob--blue" />
+          <div className="ambient-blob ambient-blob--purple" />
+        </div>
+        <AuthPage onAuth={() => {}} />
       </>
     );
   }
