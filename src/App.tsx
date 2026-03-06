@@ -132,6 +132,7 @@ export default function App() {
         if (error) console.error('Supabase profile error:', error);
         if (data) {
           setSupabaseProfile(data);
+          await db.settings.put({ key: "activeUserId", value: data.id });
         } else {
           // First sign-in for this account — create the remote profile row
           const { data: inserted } = await supabase
@@ -140,6 +141,7 @@ export default function App() {
             .select()
             .single();
           setSupabaseProfile(inserted ?? null);
+          if (inserted) await db.settings.put({ key: "activeUserId", value: inserted.id });
         }
       });
   }, [session]);

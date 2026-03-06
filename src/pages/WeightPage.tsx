@@ -19,6 +19,7 @@ import {
 import { movingAverage } from "../services/stats";
 import GoalReachedBanner from "../components/GoalReachedBanner";
 import { recalculateNutritionIfAuto } from "../services/nutritionCalculator";
+import { supabase } from "../lib/supabase";
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 
@@ -170,17 +171,32 @@ export default function WeightPage() {
       .where("[userId+dateISO]")
       .equals([currentUserId, todayISO])
       .first();
+    let entryId: string;
     if (existing) {
+      entryId = existing.id;
       await db.weightEntries.update(existing.id, { weightKg: wKg, createdAtISO, dateISO: todayISO });
     } else {
+      entryId = crypto.randomUUID();
       await db.weightEntries.add({
-        id: crypto.randomUUID(),
+        id: entryId,
         userId: currentUserId,
         dateISO: todayISO,
         weightKg: wKg,
         createdAtISO
       });
     }
+    // Fire-and-forget: sync to Supabase without blocking the local save
+    try {
+      supabase.from("weight_entries").upsert({
+        id: entryId,
+        user_id: currentUserId,
+        date_iso: todayISO,
+        weight_kg: wKg,
+        created_at: createdAtISO,
+      }).then(({ error }) => {
+        if (error) console.error("Supabase weight sync error:", error);
+      });
+    } catch { /* ignore */ }
 
     // Silently recalculate nutrition targets (TDEE changes as weight changes)
     void recalculateNutritionIfAuto(currentUserId, { weightKg: wKg });
