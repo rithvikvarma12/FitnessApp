@@ -2,16 +2,48 @@ import { useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { format, parseISO } from "date-fns";
 import { db, getActiveUserId } from "../db/db";
-import type { WeekPlan } from "../db/types";
+import type { WeekPlan, NoteChip } from "../db/types";
 import type { Unit } from "../services/units";
 import { toDisplay } from "../services/units";
 import { createFirstWeekIfMissing, generateNextWeek, getLatestWeek } from "../services/planGenerator";
+import { shouldSuggestDeload } from "../services/deloadDetector";
+import { getActiveInjuries, upsertInjuryFromChip, updateInjuryStatus } from "../services/injuryMemory";
+import type { ActiveInjury } from "../db/types";
 import WeekView from "./WeekView";
 import { initRithvikPresetWeek6 } from "../services/presets";
+import NoteChips from "../components/NoteChips";
 import GoalReachedBanner from "../components/GoalReachedBanner";
 import { weeklyTrendFromWindow } from "../services/stats";
 import { deriveAutoCardio } from "../services/cardio";
 
+
+function buildChipPreview(chips: NoteChip[]): string {
+  if (!chips || chips.length === 0) return "";
+  const parts: string[] = [];
+  for (const c of chips) {
+    if (c.type === "deload") parts.push("deload week");
+    else if (c.type === "fatigued") parts.push("feeling fatigued");
+    else if (c.type === "traveling") {
+      let s = "traveling";
+      if (c.days) s += ", " + c.days + " days";
+      if (c.equipment) s += ", " + c.equipment;
+      parts.push(s);
+    } else if (c.type === "injury") {
+      let s = c.area ? c.area + " pain" : "injury";
+      if (c.severity) s += " (" + c.severity + ")";
+      parts.push(s);
+    } else if (c.type === "focus") {
+      if (c.muscleGroup) parts.push("focus " + c.muscleGroup);
+    } else if (c.type === "days_override") {
+      if (c.days) parts.push(c.days + " days");
+    } else if (c.type === "equipment_change") {
+      let s = c.equipment ?? "equipment change";
+      if (c.duration === "until_changed") s += " (permanent)";
+      parts.push(s);
+    }
+  }
+  return parts.join(" · ");
+}
 export default function PlanPage() {
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
 
@@ -55,9 +87,29 @@ export default function PlanPage() {
     [activeUserId]
   );
 
+  const activeInjuries = useLiveQuery(
+    async () => (activeUserId ? getActiveInjuries(activeUserId) : []),
+    [activeUserId],
+    [] as ActiveInjury[]
+  );
+
+  const deloadSuggestion = useMemo(() => {
+    if (!weeks || weeks.length < 2) return null;
+    const result = shouldSuggestDeload(weeks);
+    return result.suggest ? result : null;
+  }, [weeks]);
+
+  const injuriesToCheckIn = useMemo(() => {
+    if (!activeInjuries) return [];
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 14);
+    return activeInjuries.filter((inj) => new Date(inj.lastCheckISO) < cutoff);
+  }, [activeInjuries]);
+
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dismissedDeloadForWeek, setDismissedDeloadForWeek] = useState<string | null>(null);
 
   // v0.3.2 UI: end-week-early flow
   const [endEarlyMode, setEndEarlyMode] = useState(false);
@@ -69,6 +121,19 @@ export default function PlanPage() {
     if (!weeks || weeks.length === 0) return undefined;
     return weeks.find(w => w.id === selectedWeekId) ?? weeks[0];
   }, [weeks, selectedWeekId]);
+
+  // Merge week snapshot + live active injuries for badge display
+  const displayedInjuryBadges = useMemo(() => {
+    const fromWeek = selected?.activeInjuriesSnapshot ?? [];
+    const fromLive = (activeInjuries ?? []).map((inj) => ({ area: inj.area, severity: inj.severity }));
+    const merged = [...fromWeek];
+    for (const live of fromLive) {
+      if (!merged.some((i) => i.area.toLowerCase() === live.area.toLowerCase())) {
+        merged.push(live);
+      }
+    }
+    return merged;
+  }, [selected, activeInjuries]);
 
   const completion = useMemo(() => {
     if (!selected) return { done: 0, total: 0, missed: 0, allComplete: false };
@@ -226,6 +291,21 @@ export default function PlanPage() {
         </select>
       </div>
 
+      {/* Deload + injury badges */}
+      {(selected?.isDeload || displayedInjuryBadges.length > 0) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          {selected?.isDeload && (
+            <span className="tag" style={{ background: "rgba(139,92,246,0.15)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.3)", fontSize: 11, fontWeight: 700 }}>
+              DELOAD
+            </span>
+          )}
+          {displayedInjuryBadges.map((inj) => (
+            <span key={inj.area} className="tag tag--red" style={{ fontSize: 11 }}>
+              {"⚠"} {inj.area.charAt(0).toUpperCase() + inj.area.slice(1)} ({inj.severity})
+            </span>
+          ))}
+        </div>
+      )}
       <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>
         Mark days complete to unlock generation. Miss a day? End week early.
       </div>
@@ -362,6 +442,19 @@ export default function PlanPage() {
 
       {selected ? <WeekView week={selected} /> : <div>No week plan found.</div>}
 
+      {/* Adaptive summary */}
+      {selected?.adaptations && selected.adaptations.length > 0 && (
+        <div style={{ margin: "12px 0", padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>This week adjusted for</div>
+          {selected.adaptations.map((note, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+              <span style={{ color: "var(--accent-blue)", flexShrink: 0 }}>{"•"}</span>
+              {note}
+            </div>
+          ))}
+        </div>
+      )}
+
       {selected && !selected.isLocked && (
         <>
           <hr />
@@ -375,7 +468,47 @@ export default function PlanPage() {
 
             <div className="row">
               <div className="col">
-                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Notes (used to generate next week)</div>
+                {/* Deload suggestion banner */}
+                {deloadSuggestion && dismissedDeloadForWeek !== selected?.id && (
+                  <div style={{ padding: "10px 12px", marginBottom: 10, borderRadius: "var(--radius-md)", border: "1px solid rgba(249,115,22,0.35)", background: "rgba(249,115,22,0.07)" }}>
+                    <div style={{ fontSize: 12, color: "#f97316", fontWeight: 600, marginBottom: 6 }}>Deload suggested</div>
+                    <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 8 }}>{deloadSuggestion.reason}</div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button type="button" style={{ padding: "4px 10px", fontSize: 11, fontWeight: 700, background: "rgba(249,115,22,0.15)", border: "1.5px solid #f97316", color: "#f97316", borderRadius: 20, cursor: "pointer" }}
+                        onClick={async () => {
+                          if (!selected) return;
+                          const existing = (selected.noteChips ?? []).filter(c => c.type !== "deload");
+                          await db.weekPlans.update(selected.id, { noteChips: [...existing, { type: "deload" }] });
+                        }}>
+                        Add Deload
+                      </button>
+                      <button type="button" style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, background: "transparent", border: "1.5px solid var(--border-glass-hover)", color: "var(--text-muted)", borderRadius: 20, cursor: "pointer" }}
+                        onClick={() => setDismissedDeloadForWeek(selected?.id ?? null)}>
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Quick context (next week)</div>
+                <NoteChips
+                  chips={selected.noteChips ?? []}
+                  onChange={async (chips) => {
+                    const prevChips = selected.noteChips ?? [];
+                    const oldInjChip = prevChips.find((c) => c.type === "injury");
+                    const newInjChip = chips.find((c) => c.type === "injury");
+                    await db.weekPlans.update(selected.id, { noteChips: chips });
+                    if (newInjChip && activeUserId) {
+                      await upsertInjuryFromChip(newInjChip, activeUserId);
+                    } else if (!newInjChip && oldInjChip?.area && activeUserId) {
+                      await db.activeInjuries
+                        .where("userId").equals(activeUserId)
+                        .filter((inj) => inj.area.toLowerCase() === (oldInjChip.area ?? "").toLowerCase())
+                        .delete();
+                    }
+                  }}
+                  disabled={!!selected.isLocked}
+                />
+                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, marginTop: 8 }}>Notes (used to generate next week)</div>
                 <textarea
                   ref={notesRef}
                   style={{ minHeight: 80 }}
@@ -385,6 +518,37 @@ export default function PlanPage() {
                     await db.weekPlans.update(selected.id, { notes: e.target.value });
                   }}
                 />
+                {(selected.noteChips ?? []).length > 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, fontStyle: "italic" }}>
+                    Next week: {buildChipPreview(selected.noteChips ?? [])}
+                  </div>
+                )}
+
+                {/* Injury check-in prompts */}
+                {injuriesToCheckIn.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    {injuriesToCheckIn.map((inj) => (
+                      <div key={inj.id} style={{ marginBottom: 8, padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.06)" }}>
+                        <div style={{ fontSize: 12, color: "#ef4444", fontWeight: 600, marginBottom: 6 }}>
+                          How is your {inj.area}?
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[
+                            { label: "Still painful", value: "still_painful" as const },
+                            { label: "Getting better", value: "getting_better" as const },
+                            { label: "Fully recovered", value: "resolved" as const },
+                          ].map((opt) => (
+                            <button key={opt.value} type="button"
+                              style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 20, border: "1.5px solid var(--border-glass-hover)", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}
+                              onClick={() => updateInjuryStatus(inj.id, opt.value)}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ width: 160, flexShrink: 0 }}>
@@ -470,7 +634,7 @@ export default function PlanPage() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-          {generationContext.goalMode} · target {generationContext.targetLabel} · {generationContext.daysPerWeek} days/wk · cardio {generationContext.cardioSessions}×, {generationContext.cardioMinutesLabel} min
+          {generationContext.goalMode} · target {generationContext.targetLabel} · {generationContext.daysPerWeek} days/wk · cardio {generationContext.cardioSessions}×, {generationContext.cardioMinutesLabel} min{selected?.isDeload ? " · deload week" : ""}
         </div>
 
         <div className="row" style={{ gap: 8 }}>

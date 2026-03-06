@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { WorkoutDay } from "../db/types";
 import type { PRComparison } from "../services/progressTracker";
 import { formatVolumeDisplay } from "../services/progressTracker";
@@ -8,9 +9,17 @@ type Props = {
   day: WorkoutDay;
   unit: Unit;
   prs: PRComparison[];
-  onConfirm: () => void;
+  onConfirm: (fatigueRating?: number) => void;
   onCancel: () => void;
 };
+
+const FATIGUE_OPTIONS = [
+  { value: 1, emoji: "\ud83d\ude2b", label: "Brutal",     color: "#ef4444" },
+  { value: 2, emoji: "\ud83d\ude13", label: "Hard",       color: "#f97316" },
+  { value: 3, emoji: "\ud83d\ude0a", label: "Good",       color: "#eab308" },
+  { value: 4, emoji: "\ud83d\udcaa", label: "Strong",     color: "#10b981" },
+  { value: 5, emoji: "\ud83d\udd25", label: "Crushed it", color: "#06b6d4" },
+];
 
 function calcSessionStats(day: WorkoutDay) {
   let totalSets = 0;
@@ -35,6 +44,7 @@ function calcSessionStats(day: WorkoutDay) {
 }
 
 export default function SessionSummary({ day, unit, prs, onConfirm, onCancel }: Props) {
+  const [fatigueRating, setFatigueRating] = useState<number | undefined>(undefined);
   const { completedSets, totalSets, totalVolumeKg, exerciseCount } = calcSessionStats(day);
 
   const durationMin = day.workoutStartedAt
@@ -45,7 +55,7 @@ export default function SessionSummary({ day, unit, prs, onConfirm, onCancel }: 
     ? durationMin >= 60
       ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
       : `${durationMin}m`
-    : "—";
+    : "\u2014";
 
   const volumeStr = formatVolumeDisplay(totalVolumeKg, unit);
 
@@ -90,12 +100,46 @@ export default function SessionSummary({ day, unit, prs, onConfirm, onCancel }: 
           </div>
         )}
 
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginBottom: 10, fontWeight: 600 }}>
+            How did this session feel?
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+            {FATIGUE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFatigueRating(fatigueRating === opt.value ? undefined : opt.value)}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "8px 4px",
+                  borderRadius: "var(--radius-md)",
+                  border: fatigueRating === opt.value ? "2px solid " + opt.color : "1.5px solid var(--border-glass-hover)",
+                  background: fatigueRating === opt.value ? opt.color + "22" : "transparent",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  transform: fatigueRating === opt.value ? "scale(1.05)" : "scale(1)",
+                }}
+              >
+                <span style={{ fontSize: 20 }}>{opt.emoji}</span>
+                <span style={{ fontSize: 9, fontWeight: 600, color: fatigueRating === opt.value ? opt.color : "var(--text-muted)" }}>
+                  {opt.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="session-summary-actions">
           <button type="button" className="secondary" onClick={onCancel}>
             Cancel
           </button>
-          <button type="button" onClick={onConfirm}>
-            Mark Done
+          <button type="button" onClick={() => onConfirm(fatigueRating)}>
+            Done
           </button>
         </div>
       </div>

@@ -4,6 +4,8 @@ import type { WorkoutDay, PlannedExercise, SetEntry } from "../db/types";
 import type { Unit } from "../services/units";
 import ExerciseCard from "./ExerciseCard";
 
+const FATIGUE_EMOJI: Record<number, string> = { 1: "😫", 2: "😓", 3: "😊", 4: "💪", 5: "🔥" };
+
 function getDayAccentColor(title: string): string {
   const lower = title.toLowerCase();
   if (lower.includes("push")) return "#3b82f6";
@@ -91,7 +93,14 @@ export default function DayCard({
             onClick={() => onDayComplete(day.id, !day.isComplete)}
             disabled={isLocked}
           >
-            {day.isComplete ? "✓ Done" : "Mark Done"}
+            {day.isComplete ? (
+              <>
+                ✓ Done
+                {day.fatigueRating !== undefined && (
+                  <span style={{ marginLeft: 5, fontSize: 14 }}>{FATIGUE_EMOJI[day.fatigueRating]}</span>
+                )}
+              </>
+            ) : "Mark Done"}
           </button>
           <button
             type="button"

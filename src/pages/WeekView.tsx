@@ -327,7 +327,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     }
   }
 
-  function confirmDayComplete() {
+  function confirmDayComplete(fatigueRating?: number) {
     if (!sessionSummaryDayId) return;
     const dayId = sessionSummaryDayId;
     setSessionSummaryDayId(null);
@@ -339,7 +339,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     const updated: WeekPlan = {
       ...week,
       days: week.days.map((d) =>
-        d.id === dayId ? { ...d, isComplete: true, workoutDurationMinutes: durationMinutes } : d
+        d.id === dayId ? { ...d, isComplete: true, workoutDurationMinutes: durationMinutes, ...(fatigueRating !== undefined ? { fatigueRating } : {}) } : d
       )
     };
     void updateWeek(updated);
@@ -606,7 +606,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
             day={summaryDay}
             unit={unit}
             prs={pendingPRs}
-            onConfirm={confirmDayComplete}
+            onConfirm={(fr) => confirmDayComplete(fr)}
             onCancel={() => { setSessionSummaryDayId(null); setPendingPRs([]); }}
           />
         ) : null;

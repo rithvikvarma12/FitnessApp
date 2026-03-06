@@ -11,7 +11,8 @@ import type {
   ExerciseMetaType,
   CustomExercise,
   NutritionSettings,
-  DailyNutritionLog
+  DailyNutritionLog,
+  ActiveInjury
 } from "./types";
 
 export type Setting = { key: string; value: string };
@@ -47,6 +48,7 @@ export class AppDB extends Dexie {
   weightEntries!: Table<WeightEntry, string>;
   userProfiles!: Table<UserProfile, string>;
   settings!: Table<Setting, string>;
+  activeInjuries!: Table<ActiveInjury, string>;
 
   constructor() {
     super("cutGymDB");
@@ -201,6 +203,20 @@ export class AppDB extends Dexie {
       weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
       settings: "key",
       userProfiles: "id, createdAtISO"
+    });
+    // v9 (injury memory)
+    this.version(9).stores({
+      planTemplates: "id, name",
+      exerciseTemplates: "id, name",
+      exerciseMeta: "exerciseTemplateId",
+      customExercises: "id, userId, name",
+      nutritionSettings: "id, userId",
+      dailyNutritionLogs: "id, userId, dateISO, [userId+dateISO]",
+      weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
+      weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
+      settings: "key",
+      userProfiles: "id, createdAtISO",
+      activeInjuries: "id, userId, status, [userId+status]"
     });
   }
 }

@@ -133,6 +133,17 @@ export type WorkoutDay = {
   isComplete: boolean;
   workoutStartedAt?: string; // ISO timestamp of first set completion
   workoutDurationMinutes?: number; // saved on day completion
+  fatigueRating?: number; // 1-5, optional post-session rating
+};
+
+export type NoteChip = {
+  type: "deload" | "fatigued" | "traveling" | "injury" | "focus" | "days_override" | "equipment_change";
+  days?: number;
+  equipment?: string;
+  area?: string;
+  severity?: string;
+  muscleGroup?: string;
+  duration?: string;
 };
 
 export type WeekPlan = {
@@ -144,7 +155,11 @@ export type WeekPlan = {
   days: WorkoutDay[];
   isLocked: boolean;   
   notes?: string;
+  noteChips?: NoteChip[];
   nextWeekDays?: number; // 3,4,5
+  isDeload?: boolean;
+  adaptations?: string[];
+  activeInjuriesSnapshot?: { area: string; severity: string }[];
   // lock when generating next week
 };
 
@@ -165,4 +180,16 @@ export type CustomExercise = {
   equipment: string;   // "barbell"|"dumbbell"|"cable"|"machine"|"bodyweight"|"other"
   notes?: string;
   createdAtISO: string;
+};
+
+export type ActiveInjury = {
+  id: string;
+  userId: string;
+  area: string;
+  severity: string;
+  startDateISO: string;
+  lastCheckISO: string;
+  status: "active" | "improving" | "resolved";
+  weeksSinceStart: number;
+  notes?: string;
 };

@@ -8,13 +8,16 @@ import type {
   ExerciseTemplate,
   PlanTemplate,
   DayTemplate,
-  CustomExercise
+  CustomExercise,
+  NoteChip,
+  ActiveInjury,
 } from "../db/types";
 import {
   normalizeName,
   classifyMuscleBucket,
   isGymOnlyExercise,
   isHomeFriendly,
+  isIsolationExercise,
   preferredGroupsFromDayTitle,
   cloneDayTemplates,
   applyEquipmentToDayTemplates,
@@ -22,13 +25,14 @@ import {
   remapDayTemplatesForTargetDays,
   type EquipmentType,
   type GoalMode,
-  type MuscleBucket
+  type MuscleBucket,
 } from "./exerciseSelector";
 import {
   computeNextProgressionSuggestion,
   buildPlannedSetWeightsFromBase,
-  type WeightUnit
+  type WeightUnit,
 } from "./progressionEngine";
+import { getExerciseExclusions, downgradeSeverity, getActiveInjuries } from "./injuryMemory";
 
 export { applyEquipmentToDayTemplates, remapDayTemplatesForTargetDays };
 
@@ -42,7 +46,7 @@ type GenerationConstraints = {
   timeCapMinutes?: number;
 };
 
-// ─── Note parsing ──────────────────────────────────────────────────────────────
+// --- Note parsing ---
 
 function inferNextWeekDays(notes?: string, explicit?: number | string | null): number {
   const explicitNum =
@@ -58,7 +62,7 @@ function inferNextWeekDays(notes?: string, explicit?: number | string | null): n
   const priorityPatterns = [
     /\b([345])\s*(?:x|days?)?\s*next\s*week\b/g,
     /\bnext\s*week\s*(?:for\s*)?([345])\b/g,
-    /\bfor\s+week\s+\d+\s+(?:do\s+)?([345])\b/g
+    /\bfor\s+week\s+\d+\s+(?:do\s+)?([345])\b/g,
   ];
   for (const re of priorityPatterns) {
     const matches = Array.from(text.matchAll(re));
@@ -68,10 +72,7 @@ function inferNextWeekDays(notes?: string, explicit?: number | string | null): n
     }
   }
 
-  const fallbackPatterns = [
-    /\b([345])\s*days?\b/g,
-    /\b([345])\s*x\b/g
-  ];
+  const fallbackPatterns = [/\b([345])\s*days?\b/g, /\b([345])\s*x\b/g];
   for (const re of fallbackPatterns) {
     const matches = Array.from(text.matchAll(re));
     if (matches.length > 0) {
@@ -103,7 +104,7 @@ function parseGroupMentions(notes?: string): Pick<GenerationConstraints, "focusG
     { key: "back", aliases: ["back", "lats", "lat"] },
     { key: "legs", aliases: ["legs", "leg", "quads", "hamstrings", "calves", "calf"] },
     { key: "arms", aliases: ["arms", "arm", "biceps", "triceps"] },
-    { key: "shoulders", aliases: ["shoulders", "shoulder", "delts", "delt"] }
+    { key: "shoulders", aliases: ["shoulders", "shoulder", "delts", "delt"] },
   ];
 
   const focusGroups: NoteGroup[] = [];
@@ -112,8 +113,8 @@ function parseGroupMentions(notes?: string): Pick<GenerationConstraints, "focusG
   for (const group of groups) {
     const wantsAvoid = group.aliases.some((alias) =>
       containsAny(text, [
-        `no ${alias}`, `avoid ${alias}`, `skip ${alias}`,
-        `without ${alias}`, `${alias} sore`, `${alias} hurts`, `${alias} hurt`
+        "no " + alias, "avoid " + alias, "skip " + alias,
+        "without " + alias, alias + " sore", alias + " hurts", alias + " hurt",
       ])
     );
 
@@ -124,8 +125,8 @@ function parseGroupMentions(notes?: string): Pick<GenerationConstraints, "focusG
 
     const wantsFocus = group.aliases.some((alias) =>
       containsAny(text, [
-        `focus ${alias}`, `focus on ${alias}`, `prioritize ${alias}`,
-        `more ${alias}`, `extra ${alias}`, `${alias} focus`
+        "focus " + alias, "focus on " + alias, "prioritize " + alias,
+        "more " + alias, "extra " + alias, alias + " focus",
       ])
     );
 
@@ -142,12 +143,12 @@ function parseGenerationConstraints(notes?: string, explicitDays?: number): Gene
   return { targetDays, focusGroups, avoidGroups, timeCapMinutes: parseTimeCapMinutes(notes) };
 }
 
-// ─── Week building helpers ─────────────────────────────────────────────────────
+// --- Week building helpers ---
 
 function mondayOfTodayISO(): string {
   const now = new Date();
   const day = now.getDay();
-  const diffToMonday = (day === 0 ? -6 : 1 - day);
+  const diffToMonday = day === 0 ? -6 : 1 - day;
   const monday = addDays(now, diffToMonday);
   return format(monday, "yyyy-MM-dd");
 }
@@ -165,7 +166,7 @@ function makeSets(
     plannedWeightKg: perSetPlannedWeightKg?.[i] ?? plannedWeightKg,
     actualReps: undefined,
     actualWeightKg: undefined,
-    completed: false
+    completed: false,
   }));
 }
 
@@ -278,7 +279,7 @@ function applyGenerationConstraintsToDayTemplates(
   return constrained;
 }
 
-// ─── Goal/cardio helpers ───────────────────────────────────────────────────────
+// --- Goal/cardio helpers ---
 
 function normalizeGoal(goal?: "cut" | "maintain" | "gain" | "bulk"): GoalMode {
   if (goal === "cut") return "cut";
@@ -327,7 +328,193 @@ function attachCardioBlocks(days: WorkoutDay[], goal: GoalMode): WorkoutDay[] {
   });
 }
 
-// ─── Core week generator ───────────────────────────────────────────────────────
+// --- Chip helpers ---
+
+function chipEquipmentToEquipmentType(chipEquip: string): EquipmentType {
+  const map: Record<string, EquipmentType> = {
+    "Full Gym": "gym",
+    "Hotel Gym": "gym",
+    "Bodyweight Only": "minimal",
+    "Home (bands + dumbbells)": "home",
+    "Dumbbells Only": "home",
+  };
+  return map[chipEquip] ?? "gym";
+}
+
+function chipMuscleGroupToBuckets(group: string): MuscleBucket[] {
+  const g = group.toLowerCase();
+  if (g === "chest") return ["chest"];
+  if (g === "back") return ["back"];
+  if (g === "shoulders") return ["shoulders"];
+  if (g === "legs") return ["legs"];
+  if (g === "arms") return ["biceps", "triceps"];
+  return [];
+}
+
+function injuryAdaptationNote(area: string, severity: string): string {
+  const a = area.toLowerCase();
+  const s = severity.toLowerCase();
+  const cap = a.charAt(0).toUpperCase() + a.slice(1);
+  if (a === "shoulder") {
+    if (s === "mild") return cap + " injury (" + s + ") — no overhead pressing";
+    if (s === "moderate") return cap + " injury (" + s + ") — no overhead pressing or incline work";
+    return cap + " injury (" + s + ") — no shoulder-loading exercises";
+  }
+  if (a === "knee") {
+    if (s === "mild") return cap + " injury (" + s + ") — avoiding deep squats";
+    if (s === "moderate") return cap + " injury (" + s + ") — no squats or lunges";
+    return cap + " injury (" + s + ") — no quad-dominant leg work";
+  }
+  if (a === "back") {
+    if (s === "mild") return cap + " injury (" + s + ") — no heavy deadlifts";
+    if (s === "moderate") return cap + " injury (" + s + ") — no deadlifts or heavy rows";
+    return cap + " injury (" + s + ") — no back-loading exercises";
+  }
+  if (a === "elbow") {
+    if (s === "severe") return cap + " injury (" + s + ") — no direct arm isolation";
+    return cap + " injury (" + s + ") — reduced arm isolation work";
+  }
+  if (a === "wrist") return cap + " injury (" + s + ") — barbell exercises substituted";
+  if (a === "hip") {
+    if (s === "severe") return cap + " injury (" + s + ") — no hip-hinge movements";
+    return cap + " injury (" + s + ") — no lunges or deep hip work";
+  }
+  return cap + " injury (" + s + ") — modified exercise selection";
+}
+
+function applyChipAdjustments(
+  days: WorkoutDay[],
+  chips: NoteChip[],
+  activeInjuries: ActiveInjury[],
+  adaptations: string[]
+): { days: WorkoutDay[]; isDeload: boolean; injuriesApplied: { area: string; severity: string }[] } {
+  const isDeloadWeek = chips.some((c) => c.type === "deload");
+  const isFatiguedWeek = !isDeloadWeek && chips.some((c) => c.type === "fatigued");
+  const focusChip = chips.find((c) => c.type === "focus");
+  const injuryChip = chips.find((c) => c.type === "injury");
+  const travelChip = chips.find((c) => c.type === "traveling");
+
+  const allInjuries: Array<{ area: string; severity: string; label: string }> = [];
+  if (injuryChip?.area && injuryChip?.severity) {
+    allInjuries.push({
+      area: injuryChip.area,
+      severity: injuryChip.severity,
+      label: injuryChip.area + " (" + injuryChip.severity + ")",
+    });
+  }
+  for (const inj of activeInjuries) {
+    if (allInjuries.some((i) => i.area.toLowerCase() === inj.area.toLowerCase())) continue;
+    const eff = inj.status === "improving" ? downgradeSeverity(inj.severity) : inj.severity;
+    allInjuries.push({ area: inj.area, severity: eff, label: inj.area + " (" + inj.severity + ")" });
+  }
+
+  let result = days;
+
+  // 1. Injury exclusions
+  if (allInjuries.length > 0) {
+    const allExclusions = allInjuries.flatMap((i) => getExerciseExclusions(i.area, i.severity));
+    if (allExclusions.length > 0) {
+      result = result.map((day) => ({
+        ...day,
+        exercises: day.exercises.filter(
+          (ex) => !allExclusions.some((pattern) => ex.name.toLowerCase().includes(pattern.toLowerCase()))
+        ),
+      }));
+    }
+    for (const inj of allInjuries) {
+      adaptations.push(injuryAdaptationNote(inj.area, inj.severity));
+    }
+  }
+
+  // 2. Deload: reduce sets by 1, reduce weights by 12.5%
+  if (isDeloadWeek) {
+    result = result.map((day) => ({
+      ...day,
+      exercises: day.exercises.map((ex) => {
+        const newSets = Math.max(1, ex.plannedSets - 1);
+        const newWeight =
+          ex.plannedWeightKg !== undefined ? Math.round(ex.plannedWeightKg * 0.875) : undefined;
+        return {
+          ...ex,
+          plannedSets: newSets,
+          plannedWeightKg: newWeight,
+          sets: ex.sets.slice(0, newSets).map((s) => ({
+            ...s,
+            plannedWeightKg: newWeight ?? s.plannedWeightKg,
+          })),
+        };
+      }),
+    }));
+    adaptations.push("Deload week — reduced volume and intensity");
+  }
+
+  // 3. Fatigued: remove last isolation exercise per day, or drop 1 set
+  if (isFatiguedWeek) {
+    result = result.map((day) => {
+      const isolationIdxs = day.exercises
+        .map((ex, i) => ({ ex, i }))
+        .filter(({ ex }) => isIsolationExercise(ex.name))
+        .map(({ i }) => i);
+      if (isolationIdxs.length > 0) {
+        const removeIdx = isolationIdxs[isolationIdxs.length - 1];
+        return { ...day, exercises: day.exercises.filter((_, i) => i !== removeIdx) };
+      }
+      return {
+        ...day,
+        exercises: day.exercises.map((ex) => {
+          const newSets = Math.max(1, ex.plannedSets - 1);
+          return { ...ex, plannedSets: newSets, sets: ex.sets.slice(0, newSets) };
+        }),
+      };
+    });
+    adaptations.push("Fatigue recovery — reduced accessory work");
+  }
+
+  // 4. Focus: add 1 extra set to target muscle group exercises
+  if (focusChip?.muscleGroup) {
+    const focusBuckets = chipMuscleGroupToBuckets(focusChip.muscleGroup);
+    if (focusBuckets.length > 0) {
+      result = result.map((day) => ({
+        ...day,
+        exercises: day.exercises.map((ex) => {
+          const bucket = classifyMuscleBucket(ex.name);
+          if (!focusBuckets.includes(bucket)) return ex;
+          const newSets = ex.plannedSets + 1;
+          const lastSet = ex.sets[ex.sets.length - 1];
+          return {
+            ...ex,
+            plannedSets: newSets,
+            sets: [
+              ...ex.sets,
+              {
+                setNumber: newSets,
+                plannedRepsMin: lastSet?.plannedRepsMin ?? 8,
+                plannedRepsMax: lastSet?.plannedRepsMax ?? 12,
+                plannedWeightKg: ex.plannedWeightKg,
+                actualReps: undefined,
+                actualWeightKg: undefined,
+                completed: false,
+              },
+            ],
+          };
+        }),
+      }));
+      adaptations.push("Focus: " + focusChip.muscleGroup + " — added volume");
+    }
+  }
+
+  // 5. Traveling note
+  if (travelChip) {
+    const parts = ["Traveling"];
+    if (travelChip.days) parts.push(travelChip.days + " days");
+    if (travelChip.equipment) parts.push(travelChip.equipment + " equipment");
+    adaptations.push(parts.join(", "));
+  }
+
+  return { days: result, isDeload: isDeloadWeek, injuriesApplied: allInjuries.map(i => ({ area: i.area, severity: i.severity })) };
+}
+
+// --- Core week generator ---
 
 async function generateWeekFromTemplate(
   plan: PlanTemplate,
@@ -336,7 +523,9 @@ async function generateWeekFromTemplate(
   startDateISO: string,
   prevWeek: WeekPlan | undefined,
   userId: string,
-  explicitTargetDays?: 3 | 4 | 5
+  explicitTargetDays?: 3 | 4 | 5,
+  chips?: NoteChip[],
+  activeInjuries?: ActiveInjury[]
 ): Promise<WeekPlan> {
   const start = parseISO(startDateISO);
   const userProfile = await db.userProfiles.get(userId);
@@ -345,18 +534,36 @@ async function generateWeekFromTemplate(
   const goalMode: GoalMode = normalizeGoal(userProfile?.goalMode ?? userProfile?.goal);
   const exerciseCap = exerciseCapForGoal(goalMode);
 
-  const constraints = explicitTargetDays
-    ? parseGenerationConstraints(undefined, explicitTargetDays)
-    : parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays);
+  const activeChips = chips ?? [];
+  const chipDays =
+    activeChips.find((c) => c.type === "days_override")?.days ??
+    activeChips.find((c) => c.type === "traveling")?.days;
+  const chipEquipStr =
+    activeChips.find((c) => c.type === "equipment_change")?.equipment ??
+    activeChips.find((c) => c.type === "traveling")?.equipment;
+
+  const effectiveEquipment: EquipmentType = chipEquipStr
+    ? chipEquipmentToEquipmentType(chipEquipStr)
+    : userEquipment;
+
+  const constraints = chipDays
+    ? parseGenerationConstraints(prevWeek?.notes, chipDays)
+    : explicitTargetDays
+      ? parseGenerationConstraints(undefined, explicitTargetDays)
+      : parseGenerationConstraints(prevWeek?.notes, prevWeek?.nextWeekDays);
+  if (chipDays && (chipDays === 3 || chipDays === 4 || chipDays === 5)) {
+    constraints.targetDays = chipDays;
+  }
+
   const chosenBase = remapDayTemplatesForTargetDays(plan, constraints.targetDays, exTemplates);
   const chosen = applyGenerationConstraintsToDayTemplates(chosenBase, plan, exTemplates, constraints);
-  const equipmentAdjusted = applyEquipmentToDayTemplates(chosen, exTemplates, userEquipment);
+  const equipmentAdjusted = applyEquipmentToDayTemplates(chosen, exTemplates, effectiveEquipment);
   const minExercisesPerDay = constraints.targetDays === 5 ? 1 : 5;
   const finalizedTemplates = equipmentAdjusted
-    .map((day) => dedupeAndRefillDayByName(day, exTemplates, userEquipment, minExercisesPerDay))
+    .map((day) => dedupeAndRefillDayByName(day, exTemplates, effectiveEquipment, minExercisesPerDay))
     .map((day) => ({
       ...day,
-      exerciseTemplateIds: day.exerciseTemplateIds.slice(0, exerciseCap)
+      exerciseTemplateIds: day.exerciseTemplateIds.slice(0, exerciseCap),
     }));
 
   const days: WorkoutDay[] = finalizedTemplates.map((dt) => {
@@ -369,9 +576,8 @@ async function generateWeekFromTemplate(
 
       const prevEx = lastWeekExerciseSnapshot(prevWeek, exT.name);
       const computedSets = computePlannedSets(exT.name, dt.title, goalMode);
-      const plannedSets = Number.isFinite(computedSets) && computedSets > 0
-        ? computedSets
-        : exT.defaultSets;
+      const plannedSets =
+        Number.isFinite(computedSets) && computedSets > 0 ? computedSets : exT.defaultSets;
       const progression = computeNextProgressionSuggestion(prevEx, exT.name, userUnit);
       const nextWeight = progression?.baseWeightKg;
       const perSetPlannedWeights = buildPlannedSetWeightsFromBase(
@@ -386,7 +592,7 @@ async function generateWeekFromTemplate(
         plannedSets,
         repRange: exT.repRange,
         plannedWeightKg: nextWeight,
-        sets: makeSets(plannedSets, exT, nextWeight, perSetPlannedWeights)
+        sets: makeSets(plannedSets, exT, nextWeight, perSetPlannedWeights),
       };
     });
 
@@ -395,11 +601,19 @@ async function generateWeekFromTemplate(
       dateISO,
       title: dt.title,
       exercises: plannedExercises,
-      isComplete: false
+      isComplete: false,
     };
   });
 
   const daysWithCardio = attachCardioBlocks(days, goalMode);
+
+  const adaptations: string[] = [];
+  const { days: adjustedDays, isDeload, injuriesApplied } = applyChipAdjustments(
+    daysWithCardio,
+    activeChips,
+    activeInjuries ?? [],
+    adaptations
+  );
 
   return {
     id: uid(),
@@ -407,15 +621,18 @@ async function generateWeekFromTemplate(
     weekNumber,
     startDateISO,
     createdAtISO: new Date().toISOString(),
-    days: daysWithCardio,
-    isLocked: false
+    days: adjustedDays,
+    isLocked: false,
+    ...(isDeload ? { isDeload: true } : {}),
+    ...(adaptations.length > 0 ? { adaptations } : {}),
+    ...(injuriesApplied.length > 0 ? { activeInjuriesSnapshot: injuriesApplied } : {}),
   };
 }
 
-// ─── Public API ────────────────────────────────────────────────────────────────
+// --- Public API ---
 
 export async function getLatestWeek(userId?: string): Promise<WeekPlan | undefined> {
-  const activeUserId = userId ?? await getActiveUserId();
+  const activeUserId = userId ?? (await getActiveUserId());
   if (!activeUserId) return undefined;
   const all = await db.weekPlans.where("userId").equals(activeUserId).toArray();
   all.sort((a, b) => b.weekNumber - a.weekNumber);
@@ -423,7 +640,7 @@ export async function getLatestWeek(userId?: string): Promise<WeekPlan | undefin
 }
 
 export async function createFirstWeekIfMissing(options?: { userId?: string; weekNumber?: number }) {
-  const activeUserId = options?.userId ?? await getActiveUserId();
+  const activeUserId = options?.userId ?? (await getActiveUserId());
   if (!activeUserId) throw new Error("No active profile selected.");
   const existing = await db.weekPlans.where("userId").equals(activeUserId).count();
   if (existing > 0) return;
@@ -432,15 +649,18 @@ export async function createFirstWeekIfMissing(options?: { userId?: string; week
   if (!planTemplate) throw new Error("No plan template found. Seed failed?");
 
   const builtinExercises = await db.exerciseTemplates.toArray();
-  const customExercisesRaw: CustomExercise[] = await db.customExercises.where("userId").equals(activeUserId).toArray();
+  const customExercisesRaw: CustomExercise[] = await db.customExercises
+    .where("userId")
+    .equals(activeUserId)
+    .toArray();
   const exercises: ExerciseTemplate[] = [
     ...builtinExercises,
     ...customExercisesRaw.map((cx) => ({
       id: cx.id,
       name: cx.name,
       defaultSets: cx.type === "compound" ? 4 : 3,
-      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 }
-    }))
+      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 },
+    })),
   ];
   const profile = await db.userProfiles.get(activeUserId);
   const explicitTargetDays = profile?.daysPerWeek ?? 5;
@@ -466,21 +686,40 @@ export async function generateNextWeek() {
   if (!planTemplate) throw new Error("No plan template found.");
 
   const builtinTemplates = await db.exerciseTemplates.toArray();
-  const customExercisesRaw: CustomExercise[] = await db.customExercises.where("userId").equals(activeUserId).toArray();
+  const customExercisesRaw: CustomExercise[] = await db.customExercises
+    .where("userId")
+    .equals(activeUserId)
+    .toArray();
   const exTemplates: ExerciseTemplate[] = [
     ...builtinTemplates,
     ...customExercisesRaw.map((cx) => ({
       id: cx.id,
       name: cx.name,
       defaultSets: cx.type === "compound" ? 4 : 3,
-      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 }
-    }))
+      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 },
+    })),
   ];
   const latest = await getLatestWeek(activeUserId);
 
   if (latest && !latest.isLocked) {
     await db.weekPlans.update(latest.id, { isLocked: true });
   }
+
+  const chips: NoteChip[] = latest?.noteChips ?? [];
+
+  const equipChip = chips.find((c) => c.type === "equipment_change");
+  if (equipChip?.equipment && equipChip.duration === "until_changed") {
+    const eqMap: Record<string, "gym" | "home" | "minimal"> = {
+      "Full Gym": "gym",
+      "Dumbbells Only": "home",
+      "Home (bands + dumbbells)": "home",
+      "Bodyweight Only": "minimal",
+    };
+    const newEq = eqMap[equipChip.equipment];
+    if (newEq) await db.userProfiles.update(activeUserId, { equipment: newEq });
+  }
+
+  const activeInjuries = await getActiveInjuries(activeUserId);
 
   const nextWeekNumber = (latest?.weekNumber ?? 0) + 1;
   const nextStart = latest
@@ -493,7 +732,10 @@ export async function generateNextWeek() {
     nextWeekNumber,
     nextStart,
     latest,
-    activeUserId
+    activeUserId,
+    undefined,
+    chips,
+    activeInjuries
   );
 
   await db.weekPlans.add(newWeek);

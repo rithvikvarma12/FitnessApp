@@ -40,8 +40,7 @@ function StatCard({ emoji: _emoji, value, label, accentColor }: StatCardProps) {
   return (
     <div className="progress-stat-card" style={{ borderLeftColor: accentColor }}>
       <div className="progress-stat-value">{value}</div>
-      <div className="progress-stat-label">{label}</div>
-    </div>
+      <div className="progress-stat-label">{label}</div>    </div>
   );
 }
 
@@ -460,6 +459,55 @@ export default function ProgressPage() {
           </div>
         </div>
       )}
+
+      {/* Session Ratings */}
+      {(() => {
+        const last4WeeksRatings: number[] = [];
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 28);
+        for (const week of weeks) {
+          for (const day of week.days) {
+            if (day.isComplete && day.fatigueRating !== undefined) {
+              const dayDate = new Date(day.dateISO);
+              if (dayDate >= cutoff) last4WeeksRatings.push(day.fatigueRating);
+            }
+          }
+        }
+        if (last4WeeksRatings.length === 0) return null;
+        const avg = last4WeeksRatings.reduce((s, r) => s + r, 0) / last4WeeksRatings.length;
+        const dist = [1, 2, 3, 4, 5].map((v) => ({ v, count: last4WeeksRatings.filter((r) => r === v).length }));
+        const maxCount = Math.max(...dist.map((d) => d.count), 1);
+        const FATIGUE_CFG = [
+          { v: 1, emoji: "😫", label: "Brutal",     color: "#ef4444" },
+          { v: 2, emoji: "😓", label: "Hard",       color: "#f97316" },
+          { v: 3, emoji: "😊", label: "Good",       color: "#eab308" },
+          { v: 4, emoji: "💪", label: "Strong",     color: "#10b981" },
+          { v: 5, emoji: "🔥", label: "Crushed it", color: "#06b6d4" },
+        ];
+        const avgCfg = FATIGUE_CFG[Math.round(avg) - 1] ?? FATIGUE_CFG[2];
+        return (
+          <div className="card" style={{ padding: "12px 14px" }}>
+            <div className="progress-section-title">Session Ratings (last 4 weeks)</div>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+              Average: <span style={{ fontWeight: 700, color: avgCfg.color }}>{avgCfg.emoji} {avg.toFixed(1)} — {avgCfg.label}</span>
+              <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>({last4WeeksRatings.length} sessions)</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 60 }}>
+              {dist.map((d) => {
+                const cfg = FATIGUE_CFG[d.v - 1];
+                const pct = d.count > 0 ? (d.count / maxCount) * 100 : 0;
+                return (
+                  <div key={d.v} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: "var(--text-muted)" }}>{d.count > 0 ? d.count : ""}</div>
+                    <div style={{ width: "100%", height: Math.max(pct * 0.48, d.count > 0 ? 4 : 2), background: cfg.color, borderRadius: 3, opacity: d.count > 0 ? 1 : 0.15 }} />
+                    <div style={{ fontSize: 14 }}>{cfg.emoji}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
