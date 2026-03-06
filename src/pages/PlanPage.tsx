@@ -15,6 +15,7 @@ import NoteChips from "../components/NoteChips";
 import GoalReachedBanner from "../components/GoalReachedBanner";
 import { weeklyTrendFromWindow } from "../services/stats";
 import { deriveAutoCardio } from "../services/cardio";
+import { supabase } from "../lib/supabase";
 
 
 function buildChipPreview(chips: NoteChip[]): string {
@@ -43,6 +44,27 @@ function buildChipPreview(chips: NoteChip[]): string {
     }
   }
   return parts.join(" · ");
+}
+
+function syncWeekPlanToSupabase(week: WeekPlan) {
+  try {
+    supabase.from("week_plans").upsert({
+      id: week.id,
+      user_id: week.userId,
+      week_number: week.weekNumber,
+      start_date_iso: week.startDateISO,
+      days: week.days,
+      is_locked: week.isLocked,
+      notes: week.notes ?? null,
+      note_chips: week.noteChips ?? null,
+      is_deload: week.isDeload ?? null,
+      adaptations: week.adaptations ?? null,
+      active_injuries_snapshot: week.activeInjuriesSnapshot ?? null,
+      created_at: week.createdAtISO,
+    }).then(({ error }) => {
+      if (error) console.error("Supabase week_plans sync error:", error);
+    });
+  } catch { /* ignore */ }
 }
 export default function PlanPage() {
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
@@ -479,6 +501,7 @@ export default function PlanPage() {
                           if (!selected) return;
                           const existing = (selected.noteChips ?? []).filter(c => c.type !== "deload");
                           await db.weekPlans.update(selected.id, { noteChips: [...existing, { type: "deload" }] });
+      db.weekPlans.get(selected.id).then(w => { if (w) syncWeekPlanToSupabase(w); });
                         }}>
                         Add Deload
                       </button>
@@ -497,6 +520,7 @@ export default function PlanPage() {
                     const oldInjChip = prevChips.find((c) => c.type === "injury");
                     const newInjChip = chips.find((c) => c.type === "injury");
                     await db.weekPlans.update(selected.id, { noteChips: chips });
+      db.weekPlans.get(selected.id).then(w => { if (w) syncWeekPlanToSupabase(w); });
                     if (newInjChip && activeUserId) {
                       await upsertInjuryFromChip(newInjChip, activeUserId);
                     } else if (!newInjChip && oldInjChip?.area && activeUserId) {
@@ -516,6 +540,7 @@ export default function PlanPage() {
                   value={selected.notes ?? ""}
                   onChange={async (e) => {
                     await db.weekPlans.update(selected.id, { notes: e.target.value });
+      db.weekPlans.get(selected.id).then(w => { if (w) syncWeekPlanToSupabase(w); });
                   }}
                 />
                 {(selected.noteChips ?? []).length > 0 && (
@@ -568,6 +593,7 @@ export default function PlanPage() {
                     const v = Number(raw);
                     if (v === 3 || v === 4 || v === 5) {
                       await db.weekPlans.update(selected.id, { nextWeekDays: v });
+      db.weekPlans.get(selected.id).then(w => { if (w) syncWeekPlanToSupabase(w); });
                     }
                   }}
                 >
@@ -607,6 +633,7 @@ export default function PlanPage() {
                         const mergedNotes =
                           (selected.notes?.trim() ? `${selected.notes.trim()}\n` : "") + stamp;
                         await db.weekPlans.update(selected.id, { notes: mergedNotes, isLocked: true });
+      db.weekPlans.get(selected.id).then(w => { if (w) syncWeekPlanToSupabase(w); });
                         await generateNextWeek();
                         const latest = await getLatestWeek();
                         if (latest) setSelectedWeekId(latest.id);
