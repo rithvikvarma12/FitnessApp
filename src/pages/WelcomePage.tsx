@@ -81,9 +81,6 @@ export default function WelcomePage({ profiles, onSelectProfile, onCreateNew }: 
           >
             Get Started
           </button>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
-            No account needed — your data stays on your device
-          </div>
         </div>
       ) : (
         /* ── Profile selection ── */
