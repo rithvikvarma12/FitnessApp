@@ -92,7 +92,8 @@ function presetDefaults(preset: PresetKey): FormState {
   return { ...baseGeneric };
 }
 
-export default function SetupPage() {
+interface SetupPageProps { onDone?: () => void; }
+export default function SetupPage({ onDone }: SetupPageProps = {}) {
   const [preset, setPreset] = useState<PresetKey>("generic");
   const [startRithvikWeek6, setStartRithvikWeek6] = useState(true);
   const [form, setForm] = useState<FormState>(presetDefaults("generic"));
@@ -197,6 +198,7 @@ export default function SetupPage() {
       }
 
       await db.settings.put({ key: "activeUserId", value: profile.id });
+      onDone?.();
       await db.settings.put({ key: "unit", value: profile.unit });
       await db.weightEntries.put({
         id: crypto.randomUUID(),

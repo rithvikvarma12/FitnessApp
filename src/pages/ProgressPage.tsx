@@ -259,6 +259,8 @@ export default function ProgressPage() {
   const [prDismissed, setPrDismissed] = useState(false);
   const [prFilter, setPrFilter] = useState<PRFilter>("All");
   const [prSort, setPrSort] = useState<"weight" | "name">("weight");
+  const [prBoardOpen, setPrBoardOpen] = useState(false);
+  const [topExOpen, setTopExOpen] = useState(false);
 
   // Empty state
   if (!snapshot) {
@@ -386,8 +388,18 @@ export default function ProgressPage() {
       {/* All-time PR board */}
       {sortedPRs.length > 0 && (
         <div className="progress-pr-board card">
-          <div className="progress-section-title">All-Time PR Board</div>
+          <div
+            className="progress-section-title"
+            style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: prBoardOpen ? 10 : 0 }}
+            onClick={() => setPrBoardOpen((v) => !v)}
+            role="button"
+            aria-expanded={prBoardOpen}
+          >
+            <span>All-Time PR Board</span>
+            <span className={`dayToggleChevron ${prBoardOpen ? "expanded" : ""}`}>›</span>
+          </div>
 
+          {prBoardOpen && <>
           <div className="progress-filter-row">
             <div className="progress-filter-pills">
               {(["All", "Compound", "Isolation"] as PRFilter[]).map((f) => (
@@ -429,14 +441,25 @@ export default function ProgressPage() {
               );
             })}
           </div>
+          </>
+          }
         </div>
       )}
 
       {/* Top exercises by volume */}
       {topExercises.length > 0 && (
         <div className="progress-top-exercises card">
-          <div className="progress-section-title">Top Exercises by Volume</div>
-          <div className="progress-exercise-grid">
+          <div
+            className="progress-section-title"
+            style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: topExOpen ? 10 : 0 }}
+            onClick={() => setTopExOpen((v) => !v)}
+            role="button"
+            aria-expanded={topExOpen}
+          >
+            <span>Top Exercises by Volume</span>
+            <span className={`dayToggleChevron ${topExOpen ? "expanded" : ""}`}>›</span>
+          </div>
+          {topExOpen && <div className="progress-exercise-grid">
             {topExercises.slice(0, 8).map((ex) => {
               const vol = Math.round(toDisplay(ex.totalVolumeKg, unit));
               const best = toDisplay(ex.bestWeightKg, unit);
@@ -456,7 +479,7 @@ export default function ProgressPage() {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </div>
       )}
 

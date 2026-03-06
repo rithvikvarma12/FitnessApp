@@ -7,6 +7,7 @@ import type { Unit } from "./services/units";
 // import { createFirstWeekIfMissing } from "./services/planGenerator";
 import PlanPage from "./pages/PlanPage";
 import SetupPage from "./pages/SetupPage";
+import WelcomePage from "./pages/WelcomePage";
 import WeightPage from "./pages/WeightPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProgressPage from "./pages/ProgressPage";
@@ -54,9 +55,18 @@ function ProfileIcon() {
   );
 }
 
+function SignOutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+    </svg>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("plan");
   const [ready, setReady] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
 
   const profiles = useLiveQuery(
     async () => db.userProfiles.orderBy("createdAtISO").toArray(),
@@ -112,8 +122,9 @@ export default function App() {
     );
   }
 
-  const needsSetup = (profiles?.length ?? 0) === 0 || !activeUserId;
-  if (needsSetup) {
+  const showWelcome = (!activeUserId || (profiles?.length ?? 0) === 0) && !showSetup;
+
+  if (showSetup && !activeUserId) {
     return (
       <>
         <div className="ambient-bg">
@@ -121,8 +132,28 @@ export default function App() {
           <div className="ambient-blob ambient-blob--purple" />
         </div>
         <div className="container">
-          <SetupPage />
+          <SetupPage onDone={() => setShowSetup(false)} />
         </div>
+      </>
+    );
+  }
+
+  if (showWelcome) {
+    return (
+      <>
+        <div className="ambient-bg">
+          <div className="ambient-blob ambient-blob--blue" />
+          <div className="ambient-blob ambient-blob--purple" />
+        </div>
+        <WelcomePage
+          profiles={profiles ?? []}
+          onSelectProfile={async (id) => {
+            await db.settings.put({ key: "activeUserId", value: id });
+            const profile = await db.userProfiles.get(id);
+            if (profile) await db.settings.put({ key: "unit", value: profile.unit });
+          }}
+          onCreateNew={() => setShowSetup(true)}
+        />
       </>
     );
   }
@@ -160,6 +191,15 @@ export default function App() {
                 </option>
               ))}
             </select>
+          <button
+              type="button"
+              className="secondary"
+              title="Switch profile"
+              style={{ padding: "3px 7px", marginTop: 2 }}
+              onClick={async () => { await db.settings.delete("activeUserId"); }}
+            >
+              <SignOutIcon />
+            </button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -189,7 +229,7 @@ export default function App() {
 
         {/* Page content */}
         <div key={tab} className="tab-content">
-          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : tab === "nutrition" ? <NutritionPage onGoToProfile={() => setTab("profile")} /> : <ProfilePage />}
+          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : tab === "nutrition" ? <NutritionPage onGoToProfile={() => setTab("profile")} /> : <ProfilePage onLogOut={async () => { await db.settings.delete("activeUserId"); setTab("plan"); }} />}
         </div>
       </div>
 

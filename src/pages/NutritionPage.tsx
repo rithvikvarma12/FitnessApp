@@ -17,12 +17,19 @@ import type { DailyNutritionLog } from "../db/types";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
+// Strip non-numeric chars (except decimal) so partial input like "3-" parses as 3, not NaN
+function safeNum(s: string): number {
+  const cleaned = s.replace(/[^\d.]/g, "");
+  const v = parseFloat(cleaned);
+  return Number.isFinite(v) && v >= 0 ? v : 0;
+}
+
 // ─── Progress Ring ────────────────────────────────────────────────────────────
 
 function progressColor(pct: number): string {
-  if (pct > 1.1) return "#f97316";
-  if (pct >= 0.9) return "#10b981";
-  return "#3b82f6";
+  if (pct > 1.0) return "#ef4444";   // red — exceeded target
+  if (pct >= 0.9) return "#10b981";  // green — on target
+  return "#3b82f6";                   // blue — under target
 }
 
 interface RingProps { value: number; target: number; label: string; unit?: string; hitTarget?: boolean; }
@@ -34,7 +41,7 @@ function ProgressRing({ value, target, label, unit = "", hitTarget = false }: Ri
   const color = progressColor(pct);
   const r = 28;
   const circumference = 2 * Math.PI * r;
-  const dash = Math.min(pct, 1.15) * circumference;
+  const offset = circumference * (1 - Math.min(pct, 1));
 
   return (
     <div className="nutri-ring-card">
@@ -45,10 +52,11 @@ function ProgressRing({ value, target, label, unit = "", hitTarget = false }: Ri
           fill="none"
           stroke={color}
           strokeWidth={6}
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circumference}`}
-          strokeDashoffset={circumference / 4}
-          style={{ transition: "stroke-dasharray 0.4s ease" }}
+          strokeLinecap="butt"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          transform="rotate(-90 36 36)"
+          style={{ transition: "stroke-dashoffset 0.4s ease, stroke 0.3s ease" }}
         />
         {hitTarget && value === 0
           ? <text x={36} y={39} textAnchor="middle" fill={color} fontSize={16} fontWeight={700}>✓</text>
@@ -131,6 +139,7 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
   const [hitTarget, setHitTarget] = useState(false);
+  const [autoFilledFromTarget, setAutoFilledFromTarget] = useState(false);
   const [notes, setNotes] = useState("");
   const [logBusy, setLogBusy] = useState(false);
 
@@ -144,9 +153,10 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
       setCarbs(String(existing.carbsGrams || ""));
       setFat(String(existing.fatGrams || ""));
       setHitTarget(existing.hitTarget);
+      setAutoFilledFromTarget(false);
       setNotes(existing.notes ?? "");
     } else {
-      setCalories(""); setProtein(""); setCarbs(""); setFat(""); setHitTarget(false); setNotes("");
+      setCalories(""); setProtein(""); setCarbs(""); setFat(""); setHitTarget(false); setAutoFilledFromTarget(false); setNotes("");
     }
   }, [activeUserId, viewDate]);
 
@@ -158,10 +168,10 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
         id: `${activeUserId}-${viewDate}`,
         userId: activeUserId,
         dateISO: viewDate,
-        calories: Number(calories) || 0,
-        proteinGrams: Number(protein) || 0,
-        carbsGrams: Number(carbs) || 0,
-        fatGrams: Number(fat) || 0,
+        calories: safeNum(calories),
+        proteinGrams: safeNum(protein),
+        carbsGrams: safeNum(carbs),
+        fatGrams: safeNum(fat),
         hitTarget,
         notes: notes.trim() || undefined,
       };
@@ -275,10 +285,10 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
 
       {/* Target cards */}
       <div className="nutri-rings-row">
-        <ProgressRing value={log?.calories ?? 0} target={settings.calorieTarget} label="Calories" unit="kcal" hitTarget={hitTarget} />
-        {settings.trackProtein && <ProgressRing value={log?.proteinGrams ?? 0} target={settings.proteinGrams} label="Protein" unit="g" hitTarget={hitTarget} />}
-        {settings.trackCarbs && <ProgressRing value={log?.carbsGrams ?? 0} target={settings.carbsGrams} label="Carbs" unit="g" hitTarget={hitTarget} />}
-        {settings.trackFat && <ProgressRing value={log?.fatGrams ?? 0} target={settings.fatGrams} label="Fat" unit="g" hitTarget={hitTarget} />}
+        <ProgressRing value={safeNum(calories)} target={settings.calorieTarget} label="Calories" unit="kcal" hitTarget={hitTarget} />
+        {settings.trackProtein && <ProgressRing value={safeNum(protein)} target={settings.proteinGrams} label="Protein" unit="g" hitTarget={hitTarget} />}
+        {settings.trackCarbs && <ProgressRing value={safeNum(carbs)} target={settings.carbsGrams} label="Carbs" unit="g" hitTarget={hitTarget} />}
+        {settings.trackFat && <ProgressRing value={safeNum(fat)} target={settings.fatGrams} label="Fat" unit="g" hitTarget={hitTarget} />}
       </div>
 
       {!settings.isCustom && (
@@ -332,17 +342,33 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
               checked={hitTarget}
               onChange={async (e) => {
                 const checked = e.target.checked;
+                if (checked) {
+                  const hasValues = safeNum(calories) > 0 || safeNum(protein) > 0 || safeNum(carbs) > 0 || safeNum(fat) > 0;
+                  if (!hasValues) {
+                    setCalories(String(Math.round(settings.calorieTarget)));
+                    if (settings.trackProtein) setProtein(String(Math.round(settings.proteinGrams)));
+                    if (settings.trackCarbs) setCarbs(String(Math.round(settings.carbsGrams)));
+                    if (settings.trackFat) setFat(String(Math.round(settings.fatGrams)));
+                    setAutoFilledFromTarget(true);
+                  }
+                } else if (autoFilledFromTarget) {
+                  setCalories(""); setProtein(""); setCarbs(""); setFat("");
+                  setAutoFilledFromTarget(false);
+                }
                 setHitTarget(checked);
                 if (!activeUserId) return;
-                // Auto-save immediately so state persists on navigation
+                const calVal = (checked && safeNum(calories) === 0) ? Math.round(settings.calorieTarget) : safeNum(calories);
+                const proVal = (checked && safeNum(protein) === 0 && settings.trackProtein) ? Math.round(settings.proteinGrams) : safeNum(protein);
+                const crbVal = (checked && safeNum(carbs) === 0 && settings.trackCarbs) ? Math.round(settings.carbsGrams) : safeNum(carbs);
+                const fatVal = (checked && safeNum(fat) === 0 && settings.trackFat) ? Math.round(settings.fatGrams) : safeNum(fat);
                 const entry: DailyNutritionLog = {
                   id: `${activeUserId}-${viewDate}`,
                   userId: activeUserId,
                   dateISO: viewDate,
-                  calories: Number(calories) || 0,
-                  proteinGrams: Number(protein) || 0,
-                  carbsGrams: Number(carbs) || 0,
-                  fatGrams: Number(fat) || 0,
+                  calories: calVal,
+                  proteinGrams: proVal,
+                  carbsGrams: crbVal,
+                  fatGrams: fatVal,
                   hitTarget: checked,
                   notes: notes.trim() || undefined,
                 };

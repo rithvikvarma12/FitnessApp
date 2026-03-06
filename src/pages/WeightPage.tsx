@@ -72,6 +72,8 @@ export default function WeightPage() {
   const [newWeight, setNewWeight] = useState("");
   const [goalWeightInput, setGoalWeightInput] = useState("");
   const [range, setRange] = useState<Range>("30");
+  const [chartCollapsed, setChartCollapsed] = useState(false);
+  const [showAllEntries, setShowAllEntries] = useState(false);
 
   useEffect(() => {
     if (goalWeightKg === null) {
@@ -269,24 +271,49 @@ export default function WeightPage() {
 
       {/* Chart */}
       {sortedEntries.length > 0 && (
-        <div style={{
-          background: "var(--bg-subtle)",
-          border: "1px solid var(--border-glass)",
-          borderRadius: "var(--radius-md)",
-          padding: 12,
-          marginBottom: 12
-        }}>
-          {filtered.length >= 2 ? (
-            <Line data={data} options={options} />
-          ) : (
-            <div style={{ color: "var(--text-muted)", fontSize: 12, padding: "12px 0" }}>Add at least 2 entries to see the chart.</div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Weight Chart</div>
+            <button className="secondary" style={{ padding: "2px 10px", fontSize: 11 }} onClick={() => setChartCollapsed((v) => !v)}>
+              {chartCollapsed ? "Show chart" : "Hide chart"}
+            </button>
+          </div>
+          {!chartCollapsed && (
+            <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)", padding: 12 }}>
+              {filtered.length >= 2 ? (
+                <Line data={data} options={options} />
+              ) : (
+                <div style={{ color: "var(--text-muted)", fontSize: 12, padding: "12px 0" }}>Add at least 2 entries to see the chart.</div>
+              )}
+            </div>
           )}
+          {chartCollapsed && sortedEntries.length > 0 && (() => {
+            const latest = sortedEntries[sortedEntries.length - 1];
+            const trend7 = sortedEntries.slice(-7);
+            const avgKg = trend7.reduce((s, e) => s + e.weightKg, 0) / trend7.length;
+            const diff = latest.weightKg - avgKg;
+            return (
+              <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", background: "var(--bg-subtle)", border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)" }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Latest</div>
+                  <div style={{ fontSize: 20, fontWeight: 800 }}>{toDisplay(latest.weightKg, unit).toFixed(1)} {unit}</div>
+                </div>
+                <div style={{ height: 32, width: 1, background: "var(--border-subtle)" }} />
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>7d Trend</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: diff > 0.1 ? "#f97316" : diff < -0.1 ? "#22c55e" : "var(--text-secondary)" }}>
+                    {diff > 0 ? "+" : ""}{toDisplay(diff, unit).toFixed(1)} {unit}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
       {/* Entry list */}
       <div style={{ display: "grid", gap: 6 }}>
-        {sortedEntries.slice().reverse().map((e) => (
+        {(showAllEntries ? sortedEntries.slice().reverse() : sortedEntries.slice().reverse().slice(0, 10)).map((e) => (
           <div key={e.id} style={{
             display: "flex",
             alignItems: "center",
@@ -314,6 +341,17 @@ export default function WeightPage() {
           </div>
         ))}
       </div>
+
+      {/* Show all / fewer */}
+      {sortedEntries.length > 10 && (
+        <button
+          className="secondary"
+          style={{ width: "100%", marginTop: 4, fontSize: 11 }}
+          onClick={() => setShowAllEntries((v) => !v)}
+        >
+          {showAllEntries ? "Show fewer" : `Show all ${sortedEntries.length} entries`}
+        </button>
+      )}
     </div>
   );
 }

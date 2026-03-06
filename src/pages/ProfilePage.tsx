@@ -35,7 +35,8 @@ function resolveGoalMode(profile: { goalMode?: GoalMode; goal?: "cut" | "maintai
   return "maintain";
 }
 
-export default function ProfilePage() {
+interface ProfilePageProps { onLogOut?: () => void; }
+export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const unit = useLiveQuery(async () => {
     const s = await db.settings.get("unit");
@@ -102,6 +103,7 @@ export default function ProfilePage() {
   const [activityInput, setActivityInput] = useState("1.55");
   const [nutritionCustom, setNutritionCustom] = useState<{ calories: string; protein: string; carbs: string; fat: string } | null>(null);
   const [nutritionExpanded, setNutritionExpanded] = useState(false);
+  const [nutritionMsg, setNutritionMsg] = useState<string | null>(null);
 
   // Sync body stats inputs from profile; auto-expand if stats are already set
   useEffect(() => {
@@ -584,12 +586,13 @@ export default function ProfilePage() {
                 const h = Number(heightInput);
                 const a = Number(ageInput);
                 const act = Number(activityInput);
-                if (!h || !a) return;
+                if (!h || !a) { setNutritionMsg("Enter height and age to save."); return; }
+                setNutritionMsg(null);
                 await db.userProfiles.update(activeUserId, { heightCm: h, age: a, gender: genderInput, activityMultiplier: act } as Partial<typeof profile>);
                 const wKg = latestWeight?.weightKg ?? profile.currentWeightKg ?? 70;
-                const base = generateNutritionSettings({ ...profile, heightCm: h, age: a, gender: genderInput, activityMultiplier: act }, wKg);
+                const base = generateNutritionSettings({ ...profile, goalMode: form.goalMode, heightCm: h, age: a, gender: genderInput, activityMultiplier: act }, wKg);
                 const existing = await db.nutritionSettings.get(activeUserId);
-                if (nutritionCustom && existing?.isCustom) {
+                if (nutritionCustom) {
                   await db.nutritionSettings.put({
                     ...(existing ?? { id: activeUserId, userId: activeUserId, trackProtein: true, trackCarbs: true, trackFat: true }),
                     calorieTarget: Number(nutritionCustom.calories) || (base?.calorieTarget ?? 2000),
@@ -620,9 +623,29 @@ export default function ProfilePage() {
             >
               Save Nutrition Settings
             </button>
+            {nutritionMsg && (
+              <div style={{ marginTop: 6, fontSize: 12, color: nutritionMsg.includes("Enter") ? "#f97316" : "#10b981" }}>{nutritionMsg}</div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Log Out */}
+      {onLogOut && (
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
+          <button
+            type="button"
+            className="secondary"
+            style={{ color: "#ef4444", borderColor: "rgba(239,68,68,0.4)", width: "100%", fontSize: 13 }}
+            onClick={() => {
+              const ok = window.confirm("Switch profile? Your data is saved locally.");
+              if (ok) onLogOut();
+            }}
+          >
+            Log Out / Switch Profile
+          </button>
+        </div>
+      )}
 
       {/* Custom Exercises */}
       <div style={{
