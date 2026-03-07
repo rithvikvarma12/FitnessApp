@@ -636,7 +636,7 @@ export default function PlanPage() {
       db.weekPlans.get(selected.id).then(w => { if (w) syncWeekPlanToSupabase(w); });
                         await generateNextWeek();
                         const latest = await getLatestWeek();
-                        if (latest) setSelectedWeekId(latest.id);
+                        if (latest) { setSelectedWeekId(latest.id); syncWeekPlanToSupabase(latest); }
                         setEndEarlyMode(false);
                       } catch (e: any) {
                         setErr(e?.message ?? "Could not end week early.");
@@ -673,7 +673,7 @@ export default function PlanPage() {
               try {
                 await generateNextWeek();
                 const latest = await getLatestWeek();
-                if (latest) setSelectedWeekId(latest.id);
+                if (latest) { setSelectedWeekId(latest.id); syncWeekPlanToSupabase(latest); }
               } catch (e: any) {
                 setErr(e?.message ?? "Could not generate next week.");
               } finally {

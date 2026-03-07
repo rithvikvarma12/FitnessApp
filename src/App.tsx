@@ -136,17 +136,7 @@ export default function App() {
           await syncFromSupabase(data.id);
           setSupabaseProfile(data);
         } else {
-          // First sign-in for this account — create the remote profile row
-          const { data: inserted } = await supabase
-            .from("user_profiles")
-            .insert({ id: crypto.randomUUID(), auth_id: session.user.id })
-            .select()
-            .single();
-          if (inserted) {
-            await db.settings.put({ key: "activeUserId", value: inserted.id });
-            await syncFromSupabase(inserted.id);
-          }
-          setSupabaseProfile(inserted ?? null);
+          setSupabaseProfile(null);
         }
       });
   }, [session]);

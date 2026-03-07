@@ -7,6 +7,7 @@ import { initDemoPresetForUser } from "../services/presets";
 import { deriveAutoCardio, defaultCardioTypeForGoal } from "../services/cardio";
 import { fromDisplay, toDisplay } from "../services/units";
 import { generateNutritionSettings, defaultActivityMultiplier } from "../services/nutritionCalculator";
+import { supabase } from "../lib/supabase";
 
 type PresetKey = "generic" | "demo";
 
@@ -171,22 +172,77 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
 
       await db.userProfiles.add(profile);
 
+      // Upsert full profile to Supabase now that setup is complete
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        supabase.from("user_profiles").upsert({
+          id: profile.id,
+          auth_id: session?.user?.id,
+          name: profile.name ?? null,
+          unit: profile.unit,
+          days_per_week: profile.daysPerWeek,
+          goal_mode: profile.goalMode,
+          current_weight_kg: profile.currentWeightKg ?? null,
+          target_weight_kg: profile.targetWeightKg ?? null,
+          experience: profile.experience,
+          equipment: profile.equipment,
+          cardio_goal_auto: profile.cardioGoalAuto,
+          cardio_type: profile.cardioType,
+          cardio_sessions_per_week: profile.cardioSessionsPerWeek,
+          cardio_minutes_per_session: profile.cardioMinutesPerSession,
+          notes: profile.notes ?? null,
+          height_cm: profile.heightCm ?? null,
+          age: profile.age ?? null,
+          gender: profile.gender ?? null,
+          activity_multiplier: profile.activityMultiplier ?? null,
+          created_at: profile.createdAtISO,
+        }).then(({ error }) => { if (error) console.error("Supabase profile upsert error:", error); });
+      } catch { /* ignore */ }
+
       // Auto-create nutrition settings from body stats
       const ns = generateNutritionSettings(profile, currentWeightKg);
       if (ns) {
         await db.nutritionSettings.put(ns);
+        // Sync nutrition settings to Supabase
+        try {
+          supabase.from("nutrition_settings").upsert({
+            id: ns.id,
+            user_id: ns.userId,
+            enabled: ns.enabled,
+            calorie_target: ns.calorieTarget,
+            protein_grams: ns.proteinGrams,
+            carbs_grams: ns.carbsGrams,
+            fat_grams: ns.fatGrams,
+            track_protein: ns.trackProtein,
+            track_carbs: ns.trackCarbs,
+            track_fat: ns.trackFat,
+            is_custom: ns.isCustom,
+            calculated_tdee: ns.calculatedTDEE ?? null,
+          }).then(({ error }) => { if (error) console.error("Supabase nutrition_settings upsert error:", error); });
+        } catch { /* ignore */ }
       }
 
       await db.settings.put({ key: "activeUserId", value: profile.id });
       onDone?.();
       await db.settings.put({ key: "unit", value: profile.unit });
-      await db.weightEntries.put({
+      const weightEntry = {
         id: crypto.randomUUID(),
         userId: profile.id,
         dateISO: new Date().toISOString().slice(0, 10),
         weightKg: currentWeightKg,
-        createdAtISO: new Date().toISOString()
-      });
+        createdAtISO: new Date().toISOString(),
+      };
+      await db.weightEntries.put(weightEntry);
+      // Sync weight entry to Supabase
+      try {
+        supabase.from("weight_entries").upsert({
+          id: weightEntry.id,
+          user_id: weightEntry.userId,
+          date_iso: weightEntry.dateISO,
+          weight_kg: weightEntry.weightKg,
+          created_at: weightEntry.createdAtISO,
+        }).then(({ error }) => { if (error) console.error("Supabase weight_entries upsert error:", error); });
+      } catch { /* ignore */ }
       await ensureSeedData();
 
       if (preset === "demo") {
@@ -194,6 +250,28 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
       } else {
         await createFirstWeekIfMissing({ userId: profile.id, weekNumber: 1 });
       }
+      // Sync first week plan to Supabase
+      try {
+        db.weekPlans.where("userId").equals(profile.id).first().then(w => {
+          if (w) {
+            supabase.from("week_plans").upsert({
+              id: w.id,
+              user_id: w.userId,
+              week_number: w.weekNumber,
+              start_date_iso: w.startDateISO,
+              created_at: w.createdAtISO,
+              days: w.days,
+              is_locked: w.isLocked,
+              notes: w.notes ?? null,
+              note_chips: w.noteChips ?? null,
+              next_week_days: w.nextWeekDays ?? null,
+              is_deload: w.isDeload ?? null,
+              adaptations: w.adaptations ?? null,
+              active_injuries_snapshot: w.activeInjuriesSnapshot ?? null,
+            }).then(({ error }) => { if (error) console.error("Supabase week_plans upsert error:", error); });
+          }
+        });
+      } catch { /* ignore */ }
     } catch (e: any) {
       setErr(e?.message ?? "Could not create profile.");
     } finally {
