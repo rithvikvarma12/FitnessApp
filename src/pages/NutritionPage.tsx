@@ -13,6 +13,7 @@ import {
   type ChartData,
 } from "chart.js";
 import { db, getActiveUserId } from "../db/db";
+import { supabase } from "../lib/supabase";
 import type { DailyNutritionLog } from "../db/types";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -176,6 +177,21 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
         notes: notes.trim() || undefined,
       };
       await db.dailyNutritionLogs.put(entry);
+      // Fire-and-forget: sync to Supabase
+      try {
+        console.log('nutrition sync user_id:', entry.userId);
+        supabase.from("daily_nutrition_logs").upsert({
+          id: entry.id,
+          user_id: entry.userId,
+          date_iso: entry.dateISO,
+          calories: entry.calories,
+          protein_grams: entry.proteinGrams,
+          carbs_grams: entry.carbsGrams,
+          fat_grams: entry.fatGrams,
+          hit_target: entry.hitTarget,
+          notes: entry.notes ?? null,
+        }).then(({ error }) => { if (error) console.error("Supabase nutrition sync error:", error); });
+      } catch { /* ignore */ }
     } finally {
       setLogBusy(false);
     }
@@ -373,6 +389,21 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
                   notes: notes.trim() || undefined,
                 };
                 await db.dailyNutritionLogs.put(entry);
+                // Fire-and-forget: sync to Supabase
+                try {
+                  console.log('nutrition sync user_id:', entry.userId);
+                  supabase.from("daily_nutrition_logs").upsert({
+                    id: entry.id,
+                    user_id: entry.userId,
+                    date_iso: entry.dateISO,
+                    calories: entry.calories,
+                    protein_grams: entry.proteinGrams,
+                    carbs_grams: entry.carbsGrams,
+                    fat_grams: entry.fatGrams,
+                    hit_target: entry.hitTarget,
+                    notes: entry.notes ?? null,
+                  }).then(({ error }) => { if (error) console.error("Supabase nutrition sync error:", error); });
+                } catch { /* ignore */ }
               }}
               style={{ width: 16, height: 16 }}
             />

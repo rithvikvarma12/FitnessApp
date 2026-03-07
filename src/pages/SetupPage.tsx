@@ -77,8 +77,8 @@ function presetDefaults(preset: PresetKey): FormState {
   return { ...baseGeneric };
 }
 
-interface SetupPageProps { onDone?: () => void; }
-export default function SetupPage({ onDone }: SetupPageProps = {}) {
+interface SetupPageProps { onDone?: () => void; supabaseProfileId?: string; }
+export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps = {}) {
   const [preset, setPreset] = useState<PresetKey>("generic");
   const [form, setForm] = useState<FormState>(presetDefaults("generic"));
   const [busy, setBusy] = useState(false);
@@ -145,7 +145,7 @@ export default function SetupPage({ onDone }: SetupPageProps = {}) {
       const activityMultiplier = defaultActivityMultiplier(form.daysPerWeek);
 
       const profile: UserProfile = {
-        id: crypto.randomUUID(),
+        id: supabaseProfileId ?? crypto.randomUUID(),
         name:
           form.name.trim() ||
           (preset === "demo" ? "Demo profile" : "Default"),

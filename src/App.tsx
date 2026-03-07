@@ -219,7 +219,7 @@ export default function App() {
           <div className="ambient-blob ambient-blob--purple" />
         </div>
         <div className="container">
-          <SetupPage onDone={() => setShowSetup(false)} />
+          <SetupPage onDone={() => setShowSetup(false)} supabaseProfileId={supabaseProfile?.id as string | undefined} />
         </div>
       </>
     );
