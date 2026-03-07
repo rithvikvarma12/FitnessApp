@@ -14,6 +14,7 @@ import ProgressPage from "./pages/ProgressPage";
 import NutritionPage from "./pages/NutritionPage";
 import AuthPage from "./pages/AuthPage";
 import { supabase } from "./lib/supabase";
+import { syncFromSupabase } from "./lib/syncFromSupabase";
 import type { Session } from "@supabase/supabase-js";
 
 type Tab = "plan" | "weight" | "progress" | "nutrition" | "profile";
@@ -131,8 +132,9 @@ export default function App() {
       .then(async ({ data, error }) => {
         if (error) console.error('Supabase profile error:', error);
         if (data) {
-          setSupabaseProfile(data);
           await db.settings.put({ key: "activeUserId", value: data.id });
+          await syncFromSupabase(data.id);
+          setSupabaseProfile(data);
         } else {
           // First sign-in for this account — create the remote profile row
           const { data: inserted } = await supabase
@@ -140,8 +142,11 @@ export default function App() {
             .insert({ id: crypto.randomUUID(), auth_id: session.user.id })
             .select()
             .single();
+          if (inserted) {
+            await db.settings.put({ key: "activeUserId", value: inserted.id });
+            await syncFromSupabase(inserted.id);
+          }
           setSupabaseProfile(inserted ?? null);
-          if (inserted) await db.settings.put({ key: "activeUserId", value: inserted.id });
         }
       });
   }, [session]);

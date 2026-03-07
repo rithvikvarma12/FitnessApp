@@ -1,6 +1,22 @@
 import { db } from "../db/db";
+import { supabase } from "../lib/supabase";
 import type { ActiveInjury, NoteChip } from "../db/types";
 
+function syncInjuryToSupabase(inj: ActiveInjury) {
+  try {
+    supabase.from("active_injuries").upsert({
+      id: inj.id,
+      user_id: inj.userId,
+      area: inj.area,
+      severity: inj.severity,
+      start_date_iso: inj.startDateISO,
+      last_check_iso: inj.lastCheckISO,
+      status: inj.status,
+      weeks_since_start: inj.weeksSinceStart,
+      notes: inj.notes ?? null,
+    }).then(({ error }) => { if (error) console.error("Supabase active_injuries sync error:", error); });
+  } catch { /* ignore */ }
+}
 const uid = () => crypto.randomUUID();
 
 // ─── Exercise exclusion rules ───────────────────────────────────────────────
@@ -104,17 +120,20 @@ export async function upsertInjuryFromChip(chip: NoteChip, userId: string): Prom
   const now = new Date().toISOString();
   if (existing) {
     await db.activeInjuries.update(existing.id, { severity: chip.severity, lastCheckISO: now });
+    db.activeInjuries.get(existing.id).then(inj => { if (inj) syncInjuryToSupabase(inj); });
   } else {
-    await db.activeInjuries.add({
+    const newInjury = {
       id: uid(),
       userId,
       area: chip.area,
       severity: chip.severity,
       startDateISO: now,
       lastCheckISO: now,
-      status: "active",
+      status: "active" as const,
       weeksSinceStart: 0,
-    });
+    };
+    await db.activeInjuries.add(newInjury);
+    syncInjuryToSupabase(newInjury);
   }
 }
 
@@ -125,6 +144,7 @@ export async function updateInjuryStatus(
   const now = new Date().toISOString();
   if (response === "resolved") {
     await db.activeInjuries.update(injuryId, { status: "resolved", lastCheckISO: now });
+    db.activeInjuries.get(injuryId).then(inj => { if (inj) syncInjuryToSupabase(inj); });
   } else if (response === "getting_better") {
     const inj = await db.activeInjuries.get(injuryId);
     if (!inj) return;
@@ -134,7 +154,9 @@ export async function updateInjuryStatus(
       severity: newSeverity,
       lastCheckISO: now,
     });
+    db.activeInjuries.get(injuryId).then(inj => { if (inj) syncInjuryToSupabase(inj); });
   } else {
     await db.activeInjuries.update(injuryId, { status: "active", lastCheckISO: now });
+    db.activeInjuries.get(injuryId).then(inj => { if (inj) syncInjuryToSupabase(inj); });
   }
 }

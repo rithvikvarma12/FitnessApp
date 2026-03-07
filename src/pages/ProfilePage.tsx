@@ -5,7 +5,54 @@ import type { Unit } from "../services/units";
 import { fromDisplay, toDisplay } from "../services/units";
 import type { CustomExercise, ExerciseTemplate, NutritionSettings } from "../db/types";
 import { generateNutritionSettings, defaultActivityMultiplier, recalculateNutritionIfAuto } from "../services/nutritionCalculator";
+import { supabase } from "../lib/supabase";
 
+function syncNutritionSettingsToSupabase(ns: NutritionSettings) {
+  try {
+    supabase.from("nutrition_settings").upsert({
+      id: ns.id,
+      user_id: ns.userId,
+      enabled: ns.enabled,
+      calorie_target: ns.calorieTarget,
+      protein_grams: ns.proteinGrams,
+      carbs_grams: ns.carbsGrams,
+      fat_grams: ns.fatGrams,
+      track_protein: ns.trackProtein,
+      track_carbs: ns.trackCarbs,
+      track_fat: ns.trackFat,
+      is_custom: ns.isCustom,
+      calculated_tdee: ns.calculatedTDEE ?? null,
+    }).then(({ error }) => { if (error) console.error("Supabase nutrition_settings sync error:", error); });
+  } catch { /* ignore */ }
+}
+
+async function syncUserProfileToSupabase(p: import("../db/types").UserProfile) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    supabase.from("user_profiles").upsert({
+      id: p.id,
+      name: p.name ?? null,
+      unit: p.unit,
+      days_per_week: p.daysPerWeek,
+      goal_mode: p.goalMode,
+      current_weight_kg: p.currentWeightKg ?? null,
+      target_weight_kg: p.targetWeightKg ?? null,
+      experience: p.experience,
+      equipment: p.equipment,
+      cardio_goal_auto: p.cardioGoalAuto,
+      cardio_type: p.cardioType,
+      cardio_sessions_per_week: p.cardioSessionsPerWeek,
+      cardio_minutes_per_session: p.cardioMinutesPerSession,
+      notes: p.notes ?? null,
+      height_cm: p.heightCm ?? null,
+      age: p.age ?? null,
+      gender: p.gender ?? null,
+      activity_multiplier: p.activityMultiplier ?? null,
+      created_at: p.createdAtISO,
+      auth_id: session?.user?.id,
+    }).then(({ error }) => { if (error) console.error("Supabase user_profiles sync error:", error); });
+  } catch { /* ignore */ }
+}
 type GoalMode = "cut" | "maintain" | "bulk";
 type Equipment = "gym" | "home" | "minimal";
 
@@ -140,6 +187,7 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
         daysPerWeek: form.daysPerWeek,
         equipment: form.equipment
       });
+      db.userProfiles.get(activeUserId).then(p => { if (p) syncUserProfileToSupabase(p); });
 
       // Recalculate nutrition if goal mode changed
       if (form.goalMode !== prevGoalMode && nutritionSettings) {
@@ -272,7 +320,7 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
     const dupInTemplates = (allExerciseTemplates ?? []).some((t) => t.name.toLowerCase() === nameLower);
     const dupInCustom = (customExercises ?? []).some((c) => c.name.toLowerCase() === nameLower);
     if (dupInTemplates || dupInCustom) { setCustomError("An exercise with that name already exists."); return; }
-    await db.customExercises.add({
+    const newExercise = {
       id: crypto.randomUUID(),
       userId: activeUserId,
       name: trimmed,
@@ -281,7 +329,20 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
       equipment: customForm.equipment,
       notes: customForm.notes.trim() || undefined,
       createdAtISO: new Date().toISOString()
-    });
+    };
+    await db.customExercises.add(newExercise);
+    try {
+      supabase.from("custom_exercises").upsert({
+        id: newExercise.id,
+        user_id: newExercise.userId,
+        name: newExercise.name,
+        muscle_group: newExercise.muscleGroup,
+        type: newExercise.type,
+        equipment: newExercise.equipment,
+        notes: newExercise.notes ?? null,
+        created_at: newExercise.createdAtISO,
+      }).then(({ error }) => { if (error) console.error("Supabase custom_exercises sync error:", error); });
+    } catch { /* ignore */ }
     setCustomForm({ name: "", muscleGroup: "chest", type: "isolation", equipment: "dumbbell", notes: "" });
   };
 
@@ -458,6 +519,7 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
                     calorieTarget: 2000, proteinGrams: 150, carbsGrams: 200, fatGrams: 65,
                     trackProtein: true, trackCarbs: true, trackFat: true, isCustom: false
                   });
+                  db.nutritionSettings.get(activeUserId).then(ns => { if (ns) syncNutritionSettingsToSupabase(ns); });
                 }
               }}
             >
@@ -560,6 +622,7 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
                       const recalc = generateNutritionSettings({ ...profile, heightCm: h || profile.heightCm, age: a || profile.age, gender: genderInput, activityMultiplier: act }, wKg);
                       if (!recalc) return;
                       await db.nutritionSettings.put({ ...recalc, id: activeUserId, userId: activeUserId });
+                      db.nutritionSettings.get(activeUserId).then(ns => { if (ns) syncNutritionSettingsToSupabase(ns); });
                       setNutritionCustom(null);
                     }}
                   >
@@ -589,6 +652,7 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
                 if (!h || !a) { setNutritionMsg("Enter height and age to save."); return; }
                 setNutritionMsg(null);
                 await db.userProfiles.update(activeUserId, { heightCm: h, age: a, gender: genderInput, activityMultiplier: act } as Partial<typeof profile>);
+                db.userProfiles.get(activeUserId).then(p => { if (p) syncUserProfileToSupabase(p); });
                 const wKg = latestWeight?.weightKg ?? profile.currentWeightKg ?? 70;
                 const base = generateNutritionSettings({ ...profile, goalMode: form.goalMode, heightCm: h, age: a, gender: genderInput, activityMultiplier: act }, wKg);
                 const existing = await db.nutritionSettings.get(activeUserId);
@@ -603,6 +667,7 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
                     calculatedTDEE: base?.calculatedTDEE,
                     enabled: existing?.enabled ?? true,
                   } as NutritionSettings);
+                  db.nutritionSettings.get(activeUserId).then(ns => { if (ns) syncNutritionSettingsToSupabase(ns); });
                 } else if (base) {
                   const merged: NutritionSettings = {
                     ...(existing ?? {}),
@@ -616,6 +681,7 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
                     isCustom: false,
                   };
                   await db.nutritionSettings.put(merged);
+                  syncNutritionSettingsToSupabase(merged);
                 }
                 setNutritionCustom(null);
               }}
