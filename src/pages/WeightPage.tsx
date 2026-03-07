@@ -20,6 +20,7 @@ import { movingAverage } from "../services/stats";
 import GoalReachedBanner from "../components/GoalReachedBanner";
 import { recalculateNutritionIfAuto } from "../services/nutritionCalculator";
 import { supabase } from "../lib/supabase";
+import { queueOperation } from "../lib/offlineQueue";
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 
@@ -194,7 +195,10 @@ export default function WeightPage() {
         weight_kg: wKg,
         created_at: createdAtISO,
       }).then(({ error }) => {
-        if (error) console.error("Supabase weight sync error:", error);
+        if (error) {
+          console.error("Supabase weight sync error:", error);
+          void queueOperation("weight_entries", "upsert", { id: entryId, user_id: currentUserId, date_iso: todayISO, weight_kg: wKg, created_at: createdAtISO });
+        }
       });
     } catch { /* ignore */ }
 
@@ -351,7 +355,12 @@ export default function WeightPage() {
                 await db.weightEntries.delete(e.id);
                 try {
                   supabase.from("weight_entries").delete().eq("id", e.id)
-                    .then(({ error }) => { if (error) console.error("Supabase weight delete error:", error); });
+                    .then(({ error }) => {
+                      if (error) {
+                        console.error("Supabase weight delete error:", error);
+                        void queueOperation("weight_entries", "delete", { id: e.id });
+                      }
+                    });
                 } catch { /* ignore */ }
               }}
               style={{ padding: "4px 8px", fontSize: 11 }}

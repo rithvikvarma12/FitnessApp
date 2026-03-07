@@ -14,6 +14,7 @@ import {
 } from "chart.js";
 import { db, getActiveUserId } from "../db/db";
 import { supabase } from "../lib/supabase";
+import { queueOperation } from "../lib/offlineQueue";
 import type { DailyNutritionLog } from "../db/types";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -190,7 +191,7 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
           fat_grams: entry.fatGrams,
           hit_target: entry.hitTarget,
           notes: entry.notes ?? null,
-        }).then(({ error }) => { if (error) console.error("Supabase nutrition sync error:", error); });
+        }).then(({ error }) => { if (error) { console.error("Supabase nutrition sync error:", error); void queueOperation("daily_nutrition_logs", "upsert", { id: entry.id, user_id: entry.userId, date_iso: entry.dateISO, calories: entry.calories, protein_grams: entry.proteinGrams, carbs_grams: entry.carbsGrams, fat_grams: entry.fatGrams, hit_target: entry.hitTarget, notes: entry.notes ?? null }); } });
       } catch { /* ignore */ }
     } finally {
       setLogBusy(false);

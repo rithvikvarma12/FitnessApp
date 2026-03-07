@@ -4,8 +4,10 @@ import App from "./App";
 import "./styles.css";
 import "./progress.css";
 import { registerServiceWorker } from "./pwa/registerSW";
+import { processQueue } from "./lib/offlineQueue";
 
 if (import.meta.env.PROD) { registerServiceWorker(); }
+void processQueue();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

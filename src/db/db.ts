@@ -16,6 +16,7 @@ import type {
 } from "./types";
 
 export type Setting = { key: string; value: string };
+export type SyncQueueItem = { id: string; table: string; operation: "upsert" | "delete"; payload: Record<string, unknown>; createdAt: string; };
 const uid = () => crypto.randomUUID();
 
 function makeDefaultProfile(id: string, unit: "kg" | "lb"): UserProfile {
@@ -49,6 +50,7 @@ export class AppDB extends Dexie {
   userProfiles!: Table<UserProfile, string>;
   settings!: Table<Setting, string>;
   activeInjuries!: Table<ActiveInjury, string>;
+  syncQueue!: Table<SyncQueueItem, string>;
 
   constructor() {
     super("cutGymDB");
@@ -217,6 +219,21 @@ export class AppDB extends Dexie {
       settings: "key",
       userProfiles: "id, createdAtISO",
       activeInjuries: "id, userId, status, [userId+status]"
+    });
+    // v10 (offline sync queue)
+    this.version(10).stores({
+      planTemplates: "id, name",
+      exerciseTemplates: "id, name",
+      exerciseMeta: "exerciseTemplateId",
+      customExercises: "id, userId, name",
+      nutritionSettings: "id, userId",
+      dailyNutritionLogs: "id, userId, dateISO, [userId+dateISO]",
+      weekPlans: "id, userId, weekNumber, startDateISO, createdAtISO, [userId+weekNumber]",
+      weightEntries: "id, userId, dateISO, createdAtISO, [userId+dateISO]",
+      settings: "key",
+      userProfiles: "id, createdAtISO",
+      activeInjuries: "id, userId, status, [userId+status]",
+      syncQueue: "id, createdAt"
     });
   }
 }

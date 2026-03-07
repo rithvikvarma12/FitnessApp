@@ -6,6 +6,7 @@ import { fromDisplay, toDisplay } from "../services/units";
 import type { CustomExercise, ExerciseTemplate, NutritionSettings } from "../db/types";
 import { generateNutritionSettings, defaultActivityMultiplier, recalculateNutritionIfAuto } from "../services/nutritionCalculator";
 import { supabase } from "../lib/supabase";
+import { queueOperation } from "../lib/offlineQueue";
 
 function syncNutritionSettingsToSupabase(ns: NutritionSettings) {
   try {
@@ -22,7 +23,7 @@ function syncNutritionSettingsToSupabase(ns: NutritionSettings) {
       track_fat: ns.trackFat,
       is_custom: ns.isCustom,
       calculated_tdee: ns.calculatedTDEE ?? null,
-    }).then(({ error }) => { if (error) console.error("Supabase nutrition_settings sync error:", error); });
+    }).then(({ error }) => { if (error) { console.error("Supabase nutrition_settings sync error:", error); void queueOperation("nutrition_settings", "upsert", { id: ns.id, user_id: ns.userId, enabled: ns.enabled, calorie_target: ns.calorieTarget, protein_grams: ns.proteinGrams, carbs_grams: ns.carbsGrams, fat_grams: ns.fatGrams, track_protein: ns.trackProtein, track_carbs: ns.trackCarbs, track_fat: ns.trackFat, is_custom: ns.isCustom, calculated_tdee: ns.calculatedTDEE ?? null }); } });
   } catch { /* ignore */ }
 }
 
@@ -50,7 +51,7 @@ async function syncUserProfileToSupabase(p: import("../db/types").UserProfile) {
       activity_multiplier: p.activityMultiplier ?? null,
       created_at: p.createdAtISO,
       auth_id: session?.user?.id,
-    }).then(({ error }) => { if (error) console.error("Supabase user_profiles sync error:", error); });
+    }).then(({ error }) => { if (error) { console.error("Supabase user_profiles sync error:", error); void queueOperation("user_profiles", "upsert", { id: p.id, name: p.name ?? null, unit: p.unit, days_per_week: p.daysPerWeek, goal_mode: p.goalMode, current_weight_kg: p.currentWeightKg ?? null, target_weight_kg: p.targetWeightKg ?? null, experience: p.experience, equipment: p.equipment, cardio_goal_auto: p.cardioGoalAuto, cardio_type: p.cardioType, cardio_sessions_per_week: p.cardioSessionsPerWeek, cardio_minutes_per_session: p.cardioMinutesPerSession, notes: p.notes ?? null, height_cm: p.heightCm ?? null, age: p.age ?? null, gender: p.gender ?? null, activity_multiplier: p.activityMultiplier ?? null, created_at: p.createdAtISO }); } });
   } catch { /* ignore */ }
 }
 type GoalMode = "cut" | "maintain" | "bulk";

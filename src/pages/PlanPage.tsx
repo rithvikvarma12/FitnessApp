@@ -16,6 +16,7 @@ import GoalReachedBanner from "../components/GoalReachedBanner";
 import { weeklyTrendFromWindow } from "../services/stats";
 import { deriveAutoCardio } from "../services/cardio";
 import { supabase } from "../lib/supabase";
+import { queueOperation } from "../lib/offlineQueue";
 
 
 function buildChipPreview(chips: NoteChip[]): string {
@@ -62,7 +63,7 @@ function syncWeekPlanToSupabase(week: WeekPlan) {
       active_injuries_snapshot: week.activeInjuriesSnapshot ?? null,
       created_at: week.createdAtISO,
     }).then(({ error }) => {
-      if (error) console.error("Supabase week_plans sync error:", error);
+      if (error) { console.error("Supabase week_plans sync error:", error); void queueOperation("week_plans", "upsert", { id: week.id, user_id: week.userId, week_number: week.weekNumber, start_date_iso: week.startDateISO, days: week.days, is_locked: week.isLocked, notes: week.notes ?? null, note_chips: week.noteChips ?? null, is_deload: week.isDeload ?? null, adaptations: week.adaptations ?? null, active_injuries_snapshot: week.activeInjuriesSnapshot ?? null, created_at: week.createdAtISO }); }
     });
   } catch { /* ignore */ }
 }
