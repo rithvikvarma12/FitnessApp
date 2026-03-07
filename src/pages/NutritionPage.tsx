@@ -329,7 +329,14 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
         <div className="row" style={{ gap: 8 }}>
           <div style={{ flex: "2 1 120px" }}>
             <div className="nutri-field-label">Calories (kcal)</div>
-            <input inputMode="numeric" placeholder="e.g. 1800" value={calories} onChange={(e) => setCalories(e.target.value)} />
+            <input inputMode="numeric" placeholder="e.g. 1800" value={calories} onChange={(e) => {
+              setCalories(e.target.value);
+              const cal = safeNum(e.target.value);
+              if (settings.calorieTarget > 0) {
+                if (cal >= settings.calorieTarget) setHitTarget(true);
+                else setHitTarget(false);
+              }
+            }} />
           </div>
           {settings.trackProtein && (
             <div style={{ flex: "1 1 80px" }}>
@@ -359,24 +366,21 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
               onChange={async (e) => {
                 const checked = e.target.checked;
                 if (checked) {
-                  const hasValues = safeNum(calories) > 0 || safeNum(protein) > 0 || safeNum(carbs) > 0 || safeNum(fat) > 0;
-                  if (!hasValues) {
-                    setCalories(String(Math.round(settings.calorieTarget)));
-                    if (settings.trackProtein) setProtein(String(Math.round(settings.proteinGrams)));
-                    if (settings.trackCarbs) setCarbs(String(Math.round(settings.carbsGrams)));
-                    if (settings.trackFat) setFat(String(Math.round(settings.fatGrams)));
-                    setAutoFilledFromTarget(true);
-                  }
+                  setCalories(String(Math.round(settings.calorieTarget)));
+                  if (settings.trackProtein) setProtein(String(Math.round(settings.proteinGrams)));
+                  if (settings.trackCarbs) setCarbs(String(Math.round(settings.carbsGrams)));
+                  if (settings.trackFat) setFat(String(Math.round(settings.fatGrams)));
+                  setAutoFilledFromTarget(true);
                 } else if (autoFilledFromTarget) {
                   setCalories(""); setProtein(""); setCarbs(""); setFat("");
                   setAutoFilledFromTarget(false);
                 }
                 setHitTarget(checked);
                 if (!activeUserId) return;
-                const calVal = (checked && safeNum(calories) === 0) ? Math.round(settings.calorieTarget) : safeNum(calories);
-                const proVal = (checked && safeNum(protein) === 0 && settings.trackProtein) ? Math.round(settings.proteinGrams) : safeNum(protein);
-                const crbVal = (checked && safeNum(carbs) === 0 && settings.trackCarbs) ? Math.round(settings.carbsGrams) : safeNum(carbs);
-                const fatVal = (checked && safeNum(fat) === 0 && settings.trackFat) ? Math.round(settings.fatGrams) : safeNum(fat);
+                const calVal = checked ? Math.round(settings.calorieTarget) : safeNum(calories);
+                const proVal = (checked && settings.trackProtein) ? Math.round(settings.proteinGrams) : safeNum(protein);
+                const crbVal = (checked && settings.trackCarbs) ? Math.round(settings.carbsGrams) : safeNum(carbs);
+                const fatVal = (checked && settings.trackFat) ? Math.round(settings.fatGrams) : safeNum(fat);
                 const entry: DailyNutritionLog = {
                   id: `${activeUserId}-${viewDate}`,
                   userId: activeUserId,

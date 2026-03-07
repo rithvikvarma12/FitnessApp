@@ -17,6 +17,7 @@ import { findRecentPRs } from "../services/progressTracker";
 import type { PRComparison } from "../services/progressTracker";
 import SessionSummary from "../components/SessionSummary";
 import DayCard from "../components/DayCard";
+import { supabase } from "../lib/supabase";
 import ExerciseInfoModal from "../components/ExerciseInfoModal";
 import ExerciseHistoryModal from "../components/ExerciseHistoryModal";
 import ExerciseAlternativesModal from "../components/ExerciseAlternativesModal";
@@ -309,8 +310,29 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     setTimerTotal(0);
   }
 
+  function syncWeekPlanToSupabase(w: WeekPlan) {
+    try {
+      supabase.from("week_plans").upsert({
+        id: w.id,
+        user_id: w.userId,
+        week_number: w.weekNumber,
+        start_date_iso: w.startDateISO,
+        created_at: w.createdAtISO,
+        days: w.days,
+        is_locked: w.isLocked,
+        notes: w.notes ?? null,
+        note_chips: w.noteChips ?? null,
+        next_week_days: w.nextWeekDays ?? null,
+        is_deload: w.isDeload ?? null,
+        adaptations: w.adaptations ?? null,
+        active_injuries_snapshot: w.activeInjuriesSnapshot ?? null,
+      }).then(({ error }) => { if (error) console.error("Supabase week_plans sync error:", error); });
+    } catch { /* ignore */ }
+  }
+
   async function updateWeek(updated: WeekPlan) {
     await db.weekPlans.update(week.id, updated);
+    syncWeekPlanToSupabase(updated);
   }
 
   function requestDayComplete(dayId: string, val: boolean) {

@@ -349,6 +349,10 @@ export default function WeightPage() {
                 const confirmed = window.confirm("Delete this weight entry?");
                 if (!confirmed) return;
                 await db.weightEntries.delete(e.id);
+                try {
+                  supabase.from("weight_entries").delete().eq("id", e.id)
+                    .then(({ error }) => { if (error) console.error("Supabase weight delete error:", error); });
+                } catch { /* ignore */ }
               }}
               style={{ padding: "4px 8px", fontSize: 11 }}
             >
