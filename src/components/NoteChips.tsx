@@ -1,10 +1,13 @@
 import { useState } from "react";
 import type { NoteChip } from "../db/types";
+import type { ActiveInjury } from "../db/types";
 
 interface NoteChipsProps {
   chips: NoteChip[];
   onChange: (chips: NoteChip[]) => void;
   disabled?: boolean;
+  injuries?: ActiveInjury[];
+  onUpdateInjuryStatus?: (id: string, response: "still_painful" | "getting_better" | "resolved") => void;
 }
 
 type ChipType = NoteChip["type"];
@@ -96,10 +99,11 @@ function NumberSelector({ value, min, max, color, onChange, disabled }: {
   );
 }
 
-export default function NoteChips({ chips, onChange, disabled }: NoteChipsProps) {
+export default function NoteChips({ chips, onChange, disabled, injuries, onUpdateInjuryStatus }: NoteChipsProps) {
   const [openFollowUp, setOpenFollowUp] = useState<ChipType | null>(null);
   // pendingChip holds unsaved state for chips with follow-ups not yet complete
   const [pendingChip, setPendingChip] = useState<NoteChip | null>(null);
+  const [showInjuryPanel, setShowInjuryPanel] = useState(false);
 
   function getChip(type: ChipType): NoteChip | undefined {
     return chips.find((c) => c.type === type);
@@ -192,7 +196,63 @@ export default function NoteChips({ chips, onChange, disabled }: NoteChipsProps)
             </button>
           );
         })}
+        {(injuries && injuries.filter(i => i.status !== "resolved").length > 0) && (
+          <button
+            type="button"
+            onClick={() => { setShowInjuryPanel((v) => !v); setOpenFollowUp(null); setPendingChip(null); }}
+            style={{
+              padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 20,
+              border: showInjuryPanel ? "1.5px solid #ef4444" : "1.5px solid var(--border-glass-hover)",
+              background: showInjuryPanel ? "rgba(239,68,68,0.15)" : "transparent",
+              color: showInjuryPanel ? "#ef4444" : "var(--text-secondary)",
+              cursor: "pointer", transition: "all 0.15s",
+              whiteSpace: "nowrap", flexShrink: 0,
+            }}
+          >
+            Injury Update
+          </button>
+        )}
       </div>
+
+      {showInjuryPanel && injuries && injuries.filter(i => i.status !== "resolved").length > 0 && (
+        <div style={{
+          background: "rgba(239,68,68,0.04)",
+          border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: "var(--radius-md)",
+          padding: "10px 12px",
+          marginBottom: 8,
+        }}>
+          <div style={{ fontSize: 10, color: "#ef4444", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+            Current Injuries — tap to update
+          </div>
+          {injuries.filter(i => i.status !== "resolved").map((inj) => (
+            <div key={inj.id} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, textTransform: "capitalize" }}>
+                {inj.area}
+                <span style={{ fontWeight: 400, color: "var(--text-secondary)", marginLeft: 6 }}>
+                  ({inj.status === "improving" ? "improving" : inj.severity})
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  style={{ padding: "3px 10px", fontSize: 11, fontWeight: 600, borderRadius: 16, border: "1.5px solid #f59e0b", background: inj.status === "improving" ? "rgba(245,158,11,0.15)" : "transparent", color: "#f59e0b", cursor: "pointer" }}
+                  onClick={() => onUpdateInjuryStatus?.(inj.id, "getting_better")}
+                >
+                  Improving
+                </button>
+                <button
+                  type="button"
+                  style={{ padding: "3px 10px", fontSize: 11, fontWeight: 600, borderRadius: 16, border: "1.5px solid #22c55e", background: "transparent", color: "#22c55e", cursor: "pointer" }}
+                  onClick={() => onUpdateInjuryStatus?.(inj.id, "resolved")}
+                >
+                  Resolved
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {openFollowUp && followUpData && activeCfg && (
         <div style={{

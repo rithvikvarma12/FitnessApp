@@ -609,6 +609,8 @@ export default function PlanPage() {
                 <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Quick context (next week)</div>
                 <NoteChips
                   chips={selected.noteChips ?? []}
+                  injuries={activeInjuries ?? []}
+                  onUpdateInjuryStatus={(id, response) => { void updateInjuryStatus(id, response); }}
                   onChange={async (chips) => {
                     const prevChips = selected.noteChips ?? [];
                     const oldInjChip = prevChips.find((c) => c.type === "injury");

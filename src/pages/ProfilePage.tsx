@@ -3,7 +3,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
 import { fromDisplay, toDisplay } from "../services/units";
-import type { CustomExercise, ExerciseTemplate, NutritionSettings } from "../db/types";
+import type { CustomExercise, ExerciseTemplate, NutritionSettings, ActiveInjury } from "../db/types";
+import { updateInjuryStatus } from "../services/injuryMemory";
 import { generateNutritionSettings, defaultActivityMultiplier, recalculateNutritionIfAuto } from "../services/nutritionCalculator";
 import { supabase } from "../lib/supabase";
 import { queueOperation } from "../lib/offlineQueue";
@@ -84,6 +85,81 @@ function resolveGoalMode(profile: { goalMode?: GoalMode; goal?: "cut" | "maintai
 }
 
 interface ProfilePageProps { onLogOut?: () => void; }
+const SEVERITY_COLOR: Record<string, string> = {
+  mild: "#22c55e",
+  moderate: "#f59e0b",
+  severe: "#ef4444",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  active: "Active",
+  improving: "Improving",
+  resolved: "Resolved",
+};
+
+function InjuryCard({ inj }: { inj: ActiveInjury }) {
+  const isResolved = inj.status === "resolved";
+  const weeksAgo = inj.weeksSinceStart;
+  const startDate = inj.startDateISO
+    ? new Date(inj.startDateISO).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "Unknown";
+
+  return (
+    <div style={{
+      background: isResolved ? "var(--bg-subtle)" : "var(--card-bg)",
+      border: "1px solid var(--border)",
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginBottom: 10,
+      opacity: isResolved ? 0.65 : 1,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)", textTransform: "capitalize" }}>
+          {inj.area}
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
+          background: (SEVERITY_COLOR[inj.severity] ?? "#888") + "22",
+          color: SEVERITY_COLOR[inj.severity] ?? "#888",
+          textTransform: "capitalize",
+        }}>
+          {inj.severity}
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
+          background: isResolved ? "rgba(34,197,94,0.1)" : "rgba(251,191,36,0.12)",
+          color: isResolved ? "#22c55e" : "#f59e0b",
+        }}>
+          {STATUS_LABEL[inj.status] ?? inj.status}
+        </span>
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: isResolved ? 0 : 10 }}>
+        Started {startDate} · {weeksAgo === 1 ? "1 week" : `${weeksAgo} weeks`} ago
+      </div>
+      {!isResolved && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            className="secondary"
+            style={{ fontSize: 12, padding: "4px 12px" }}
+            onClick={() => void updateInjuryStatus(inj.id, "getting_better")}
+          >
+            Mark Improving
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            style={{ fontSize: 12, padding: "4px 12px", color: "#22c55e" }}
+            onClick={() => void updateInjuryStatus(inj.id, "resolved")}
+          >
+            Mark Resolved
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const unit = useLiveQuery(async () => {
@@ -126,6 +202,11 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
   const customExercises = useLiveQuery(
     async () => activeUserId ? db.customExercises.where("userId").equals(activeUserId).toArray() : [],
     [activeUserId], [] as CustomExercise[]
+  );
+
+  const injuries = useLiveQuery(
+    async () => activeUserId ? db.activeInjuries.where("userId").equals(activeUserId).toArray() : [],
+    [activeUserId], [] as ActiveInjury[]
   );
   const allExerciseTemplates = useLiveQuery(
     () => db.exerciseTemplates.toArray(), [], [] as ExerciseTemplate[]
@@ -844,6 +925,43 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* ── Injuries ─────────────────────────────────────────────────────── */}
+      <div style={{ marginTop: 32 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: "var(--text-primary)" }}>
+          Injuries
+        </h2>
+        {injuries.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>No injuries logged.</p>
+        ) : (
+          <>
+            {injuries.filter((inj) => inj.status !== "resolved").length > 0 && (
+              <>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Active Injuries
+                </h3>
+                {injuries
+                  .filter((inj) => inj.status !== "resolved")
+                  .map((inj) => (
+                    <InjuryCard key={inj.id} inj={inj} />
+                  ))}
+              </>
+            )}
+            {injuries.filter((inj) => inj.status === "resolved").length > 0 && (
+              <>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, marginTop: 20, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Injury History
+                </h3>
+                {injuries
+                  .filter((inj) => inj.status === "resolved")
+                  .map((inj) => (
+                    <InjuryCard key={inj.id} inj={inj} />
+                  ))}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
