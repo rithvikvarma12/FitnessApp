@@ -605,6 +605,60 @@ async function generateWeekFromTemplate(
     };
   });
 
+  // Apply female-specific modifications
+  const userGender = userProfile?.gender;
+  if (userGender === "female") {
+    // 1. Increase rep ranges on all exercises by 4
+    for (const day of days) {
+      for (const ex of day.exercises) {
+        ex.repRange = { min: ex.repRange.min + 4, max: ex.repRange.max + 4 };
+        for (const set of ex.sets) { set.plannedRepsMin += 4; set.plannedRepsMax += 4; }
+      }
+    }
+    // 2. Insert Hip Thrust or Glute Bridge at start of Lower days
+    const gluteTemplate =
+      exTemplates.find((e) => e.name.toLowerCase() === "hip thrust") ??
+      exTemplates.find((e) => e.name.toLowerCase() === "glute bridge");
+    if (gluteTemplate) {
+      for (const day of days) {
+        if (day.title.toLowerCase().includes("lower") && !day.exercises.some((e) => e.name.toLowerCase() === gluteTemplate.name.toLowerCase())) {
+          const prevEx = lastWeekExerciseSnapshot(prevWeek, gluteTemplate.name);
+          const ps = computePlannedSets(gluteTemplate.name, day.title, goalMode);
+          const prog = computeNextProgressionSuggestion(prevEx, gluteTemplate.name, userUnit);
+          const nw = prog?.baseWeightKg;
+          const boostedRange = { min: gluteTemplate.repRange.min + 4, max: gluteTemplate.repRange.max + 4 };
+          day.exercises.unshift({
+            id: uid(), name: gluteTemplate.name, plannedSets: ps, repRange: boostedRange,
+            plannedWeightKg: nw,
+            sets: makeSets(ps, { ...gluteTemplate, repRange: boostedRange }, nw, buildPlannedSetWeightsFromBase(ps, nw, prog?.rampOffsetsKg)),
+          });
+        }
+      }
+    }
+    // 3. Replace last exercise on Chest days with a shoulders exercise
+    for (const day of days) {
+      if (day.title.toLowerCase().includes("chest") && day.exercises.length > 0) {
+        const shoulderTemplate = exTemplates.find((e) =>
+          classifyMuscleBucket(e.name) === "shoulders" &&
+          !day.exercises.some((ex) => ex.name.toLowerCase() === e.name.toLowerCase())
+        );
+        if (shoulderTemplate) {
+          day.exercises.pop();
+          const prevEx = lastWeekExerciseSnapshot(prevWeek, shoulderTemplate.name);
+          const ps = computePlannedSets(shoulderTemplate.name, day.title, goalMode);
+          const prog = computeNextProgressionSuggestion(prevEx, shoulderTemplate.name, userUnit);
+          const nw = prog?.baseWeightKg;
+          const boostedRange = { min: shoulderTemplate.repRange.min + 4, max: shoulderTemplate.repRange.max + 4 };
+          day.exercises.push({
+            id: uid(), name: shoulderTemplate.name, plannedSets: ps, repRange: boostedRange,
+            plannedWeightKg: nw,
+            sets: makeSets(ps, { ...shoulderTemplate, repRange: boostedRange }, nw, buildPlannedSetWeightsFromBase(ps, nw, prog?.rampOffsetsKg)),
+          });
+        }
+      }
+    }
+  }
+
   const daysWithCardio = attachCardioBlocks(days, goalMode);
 
   const adaptations: string[] = [];

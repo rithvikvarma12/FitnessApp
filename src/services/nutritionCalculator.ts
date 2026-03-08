@@ -44,15 +44,23 @@ const MACRO_SPLIT: Record<"cut" | "maintain" | "bulk", { protein: number; carbs:
 
 export function calculateMacros(
   tdee: number,
-  goalMode: "cut" | "maintain" | "bulk"
+  goalMode: "cut" | "maintain" | "bulk",
+  gender: "male" | "female",
+  weightKg: number
 ): { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number } {
   const calories = caloricTarget(tdee, goalMode);
+  const proteinGrams = Math.round(weightKg * (gender === "male" ? 2.0 : 1.6));
+  const proteinCals = proteinGrams * 4;
+  const remaining = Math.max(0, calories - proteinCals);
   const split = MACRO_SPLIT[goalMode];
+  const nonProteinRatio = split.carbs + split.fat;
+  const carbsRatio = nonProteinRatio > 0 ? split.carbs / nonProteinRatio : 0.6;
+  const fatRatio  = nonProteinRatio > 0 ? split.fat  / nonProteinRatio : 0.4;
   return {
     calories,
-    proteinGrams: Math.round((calories * split.protein) / 4),
-    carbsGrams:   Math.round((calories * split.carbs) / 4),
-    fatGrams:     Math.round((calories * split.fat) / 9),
+    proteinGrams,
+    carbsGrams: Math.round((remaining * carbsRatio) / 4),
+    fatGrams:   Math.round((remaining * fatRatio)  / 9),
   };
 }
 
@@ -67,7 +75,7 @@ export function generateNutritionSettings(
 
   const multiplier = activityMultiplier ?? defaultActivityMultiplier(daysPerWeek);
   const tdee = calculateTDEE(weightKg, heightCm, age, gender, multiplier);
-  const macros = calculateMacros(tdee, goalMode);
+  const macros = calculateMacros(tdee, goalMode, gender, weightKg);
 
   return {
     id,
