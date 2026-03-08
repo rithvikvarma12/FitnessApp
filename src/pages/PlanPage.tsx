@@ -2,11 +2,12 @@ import { useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { format, parseISO } from "date-fns";
 import { db, getActiveUserId } from "../db/db";
-import type { WeekPlan, NoteChip } from "../db/types";
+import type { WeekPlan, NoteChip, WorkoutDay, PlannedExercise, ExerciseTemplate, CustomExercise } from "../db/types";
 import type { Unit } from "../services/units";
 import { toDisplay } from "../services/units";
 import { createFirstWeekIfMissing, generateNextWeek, getLatestWeek } from "../services/planGenerator";
 import { shouldSuggestDeload } from "../services/deloadDetector";
+import { classifyMuscleBucket } from "../services/exerciseSelector";
 import { getActiveInjuries, upsertInjuryFromChip, updateInjuryStatus } from "../services/injuryMemory";
 import type { ActiveInjury } from "../db/types";
 import WeekView from "./WeekView";
@@ -18,6 +19,95 @@ import { deriveAutoCardio } from "../services/cardio";
 import { supabase } from "../lib/supabase";
 import { queueOperation } from "../lib/offlineQueue";
 
+
+// ─── Adjust Remaining Days helpers ────────────────────────────────────────────
+
+type MuscleKey = "chest" | "back" | "legs" | "shoulders" | "biceps" | "triceps";
+type DayTypeConfig = { title: string; groups: MuscleKey[] };
+
+const CANDIDATE_DAYS: DayTypeConfig[] = [
+  { title: "Lower + Back",           groups: ["legs", "back"] },
+  { title: "Upper Pull + Shoulders", groups: ["back", "biceps", "shoulders"] },
+  { title: "Shoulders + Arms",       groups: ["shoulders", "triceps", "biceps"] },
+  { title: "Upper Push",             groups: ["chest", "shoulders", "triceps"] },
+  { title: "Full Body",              groups: ["chest", "back", "legs", "shoulders"] },
+];
+
+function selectDayTypes(coveredGroups: Set<string>, count: number): DayTypeConfig[] {
+  // Pass 1: keep only candidates with zero overlap with coveredGroups
+  const noOverlap = CANDIDATE_DAYS.filter(
+    (dt) => !dt.groups.some((g) => coveredGroups.has(g))
+  );
+  // Sort by number of groups desc (more groups = more comprehensive day)
+  const byGroupCount = (a: DayTypeConfig, b: DayTypeConfig) =>
+    b.groups.length - a.groups.length;
+
+  if (noOverlap.length >= count) {
+    return noOverlap.sort(byGroupCount).slice(0, count);
+  }
+
+  // Pass 2 fallback: allow overlap — sort by overlap asc, uncovered desc.
+  // "Full Body" is last resort: deprioritised unless there are no other options.
+  const isFullBody = (dt: DayTypeConfig) => dt.title === "Full Body";
+  const fallback = CANDIDATE_DAYS
+    .filter((dt) => dt.groups.some((g) => coveredGroups.has(g)))
+    .map((dt) => ({
+      dt,
+      overlap:   dt.groups.filter((g) => coveredGroups.has(g)).length,
+      uncovered: dt.groups.filter((g) => !coveredGroups.has(g)).length,
+    }))
+    .sort((a, b) =>
+      // Full Body always last
+      (isFullBody(a.dt) ? 1 : 0) - (isFullBody(b.dt) ? 1 : 0) ||
+      // Then least overlap first
+      a.overlap - b.overlap ||
+      // Then most uncovered first
+      b.uncovered - a.uncovered
+    )
+    .map((s) => s.dt);
+
+  return [...noOverlap.sort(byGroupCount), ...fallback].slice(0, count);
+}
+
+function buildWorkoutDay(
+  dayType: DayTypeConfig, dateISO: string, allExercises: ExerciseTemplate[],
+  coveredGroups: Set<string>, usedExNames: Set<string>
+): WorkoutDay {
+  const TARGET = 5;
+  const uncoveredInDay = dayType.groups.filter((m) => !coveredGroups.has(m));
+  const targetMuscles: string[] = uncoveredInDay.length > 0 ? uncoveredInDay : dayType.groups;
+  const byMuscle: Record<string, ExerciseTemplate[]> = {};
+  for (const ex of allExercises) {
+    if (usedExNames.has(ex.name)) continue;
+    const b = classifyMuscleBucket(ex.name);
+    if (!targetMuscles.includes(b)) continue;
+    if (!byMuscle[b]) byMuscle[b] = [];
+    byMuscle[b].push(ex);
+  }
+  const picked: ExerciseTemplate[] = [];
+  const pickedNames = new Set<string>();
+  let safety = 0;
+  while (picked.length < TARGET && safety < 20) {
+    safety++;
+    let anyAdded = false;
+    for (const muscle of targetMuscles) {
+      if (picked.length >= TARGET) break;
+      const pool = byMuscle[muscle] ?? [];
+      const ex = pool.find((e) => !pickedNames.has(e.name));
+      if (ex) { picked.push(ex); pickedNames.add(ex.name); usedExNames.add(ex.name); anyAdded = true; }
+    }
+    if (!anyAdded) break;
+  }
+  const exercises: PlannedExercise[] = picked.map((exT) => ({
+    id: crypto.randomUUID(), name: exT.name, plannedSets: exT.defaultSets, repRange: exT.repRange,
+    plannedWeightKg: undefined,
+    sets: Array.from({ length: exT.defaultSets }, (_, i) => ({
+      setNumber: i + 1, plannedRepsMin: exT.repRange.min, plannedRepsMax: exT.repRange.max,
+      plannedWeightKg: undefined, completed: false,
+    })),
+  }));
+  return { id: crypto.randomUUID(), dateISO, title: dayType.title, exercises, isComplete: false };
+}
 
 function buildChipPreview(chips: NoteChip[]): string {
   if (!chips || chips.length === 0) return "";
@@ -136,6 +226,9 @@ export default function PlanPage() {
 
   // v0.3.2 UI: end-week-early flow
   const [endEarlyMode, setEndEarlyMode] = useState(false);
+  const [adjustRemainingMode, setAdjustRemainingMode] = useState(false);
+  const [adjustDayCount, setAdjustDayCount] = useState<1 | 2 | 3 | null>(null);
+  const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
   const notesRef = useRef<HTMLTextAreaElement | null>(null);
 
   const isEmpty = (weeks?.length ?? 0) === 0;
@@ -695,11 +788,142 @@ export default function PlanPage() {
           >
             End Week Early
           </button>
+
+          <button
+            className="secondary"
+            disabled={busy || !selected || !!selected?.isLocked || completion.allComplete}
+            onClick={() => { setAdjustRemainingMode(true); setAdjustDayCount(null); setAdjustMsg(null); }}
+          >
+            Adjust Remaining Days
+          </button>
         </div>
 
         {!completion.allComplete && selected && !selected.isLocked && (
           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
             Finish all days or use "End Week Early" to generate next week.
+          </div>
+        )}
+
+        {adjustMsg && (
+          <div className="tag tag--green" style={{ padding: "6px 10px", fontSize: 12 }}>{adjustMsg}</div>
+        )}
+
+        {adjustRemainingMode && (
+          <div style={{
+            marginTop: 8,
+            padding: "10px 12px",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid rgba(59, 130, 246, 0.25)",
+            background: "rgba(59, 130, 246, 0.06)",
+            fontSize: 12,
+            color: "var(--text-secondary)"
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>How many days do you have left this week?</div>
+            <div className="row" style={{ gap: 6, marginBottom: 10 }}>
+              {([1, 2, 3] as const).map((n) => (
+                <button
+                  key={n}
+                  className={adjustDayCount === n ? "" : "secondary"}
+                  style={{ padding: "4px 14px", fontSize: 13 }}
+                  onClick={() => setAdjustDayCount(n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <button
+                disabled={busy || adjustDayCount === null}
+                onClick={async () => {
+                  if (!selected || !adjustDayCount) return;
+                  setErr(null);
+                  setBusy(true);
+                  try {
+                    // --- Manual remaining-day builder ---
+                    const completedDays = selected.days.filter((d) => d.isComplete);
+                    const incompleteDays = selected.days
+                      .filter((d) => !d.isComplete)
+                      .sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+                    const slotDates = incompleteDays
+                      .slice(0, adjustDayCount)
+                      .map((d) => d.dateISO);
+
+                    // Build coveredGroups from completed day titles via explicit keyword rules
+                    const coveredGroups = new Set<string>();
+                    for (const day of completedDays) {
+                      const t = day.title.toLowerCase();
+                      if (t.includes("chest") || t.includes("bicep")) {
+                        coveredGroups.add("chest"); coveredGroups.add("biceps");
+                      }
+                      if (t.includes("back"))                        coveredGroups.add("back");
+                      if (t.includes("leg") || t.includes("lower")) coveredGroups.add("legs");
+                      if (t.includes("shoulder"))                    coveredGroups.add("shoulders");
+                      if (t.includes("tricep"))                      coveredGroups.add("triceps");
+                    }
+
+                    // Log for debugging
+                    const noOverlapCandidates = CANDIDATE_DAYS.filter(
+                      (dt) => !dt.groups.some((g) => coveredGroups.has(g))
+                    );
+                    const candidateScores = CANDIDATE_DAYS.map((dt) => ({
+                      title: dt.title,
+                      overlap: dt.groups.filter((g) => coveredGroups.has(g)).length,
+                      uncovered: dt.groups.filter((g) => !coveredGroups.has(g)).length,
+                    }));
+                    console.log("[AdjustRemaining] coveredGroups:", Array.from(coveredGroups));
+                    console.log("[AdjustRemaining] all candidates:", candidateScores);
+                    console.log("[AdjustRemaining] zero-overlap candidates:", noOverlapCandidates.map((d) => d.title));
+
+                    const chosenTypes = selectDayTypes(coveredGroups, slotDates.length);
+                    console.log("[AdjustRemaining] chosen:", chosenTypes.map((d) => d.title));
+
+                    // Load exercise pool (builtins + custom exercises)
+                    const builtinEx = await db.exerciseTemplates.toArray();
+                    const customsRaw: CustomExercise[] = await db.customExercises
+                      .where("userId").equals(selected.userId).toArray();
+                    const allEx: ExerciseTemplate[] = [
+                      ...builtinEx,
+                      ...customsRaw.map((cx) => ({
+                        id: cx.id,
+                        name: cx.name,
+                        defaultSets: cx.type === "compound" ? 4 : 3,
+                        repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 },
+                      })),
+                    ];
+
+                    // Avoid repeating any exercise already done in completed days
+                    const usedExNames = new Set<string>(
+                      completedDays.flatMap((d) => d.exercises.map((e) => e.name))
+                    );
+
+                    // Build each remaining day
+                    const newDays: WorkoutDay[] = slotDates.map((dateISO, i) => {
+                      const dayType = chosenTypes[i] ?? chosenTypes[chosenTypes.length - 1];
+                      return buildWorkoutDay(dayType, dateISO, allEx, coveredGroups, usedExNames);
+                    });
+
+                    const mergedDays = [...completedDays, ...newDays].sort(
+                      (a, b) => a.dateISO.localeCompare(b.dateISO)
+                    );
+                    await db.weekPlans.update(selected.id, { days: mergedDays });
+                    const updated = await db.weekPlans.get(selected.id);
+                    if (updated) syncWeekPlanToSupabase(updated);
+                    setAdjustRemainingMode(false);
+                    setAdjustMsg(`Plan adjusted to ${adjustDayCount} remaining day${adjustDayCount > 1 ? "s" : ""}.`);
+                    setTimeout(() => setAdjustMsg(null), 4000);
+                  } catch (e: any) {
+                    setErr(e?.message ?? "Could not adjust remaining days.");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {busy ? "Adjusting…" : "Confirm"}
+              </button>
+              <button className="secondary" disabled={busy} onClick={() => setAdjustRemainingMode(false)}>
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 

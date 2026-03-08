@@ -795,3 +795,157 @@ export async function generateNextWeek() {
   await db.weekPlans.add(newWeek);
   return newWeek;
 }
+
+// Returns the set of muscle buckets a completed day title covers.
+// Handles all common title formats: plain group names, slash/plus combos, Upper Push/Pull, Full Body.
+function musclesFromDayTitle(title: string): MuscleBucket[] {
+  const t = title.toLowerCase();
+
+  // Full Body covers everything
+  if (t.includes("full body") || t.includes("fullbody"))
+    return ["chest", "back", "legs", "shoulders", "biceps", "triceps"];
+
+  const covered = new Set<MuscleBucket>();
+
+  // Leg / lower variants
+  if (t.includes("lower") || t.includes("leg") || t.includes("glute")) covered.add("legs");
+
+  // Push patterns: Upper Push, Chest days
+  if (
+    (t.includes("upper") && (t.includes("push") || t.includes("push focus"))) ||
+    t.includes("chest")
+  ) {
+    covered.add("chest");
+    covered.add("shoulders");
+    covered.add("triceps");
+  }
+
+  // Pull patterns: Upper Pull, Back days
+  if (
+    (t.includes("upper") && (t.includes("pull") || t.includes("pull focus"))) ||
+    t.includes("back") ||
+    t.includes("pull + shoulder") ||
+    t.includes("lower + back")
+  ) {
+    covered.add("back");
+    covered.add("biceps");
+  }
+
+  // Standalone shoulder day
+  if (t.includes("shoulder")) {
+    covered.add("shoulders");
+    covered.add("triceps");
+  }
+
+  // Bicep day
+  if (t.includes("bicep")) {
+    covered.add("biceps");
+    covered.add("back"); // typically paired
+  }
+
+  // Tricep day
+  if (t.includes("tricep")) {
+    covered.add("triceps");
+    covered.add("chest"); // typically paired
+  }
+
+  // Arms day
+  if (t.includes("arm")) {
+    covered.add("biceps");
+    covered.add("triceps");
+  }
+
+  // If nothing matched, fall back to exercise-name analysis below (return empty for now)
+  return Array.from(covered);
+}
+
+export async function generateAdjustedRemainingDays(
+  currentWeek: WeekPlan,
+  targetRemainingCount: 1 | 2 | 3
+): Promise<WorkoutDay[]> {
+  const activeUserId = currentWeek.userId;
+  const planTemplate = await db.planTemplates.toCollection().first();
+  if (!planTemplate) throw new Error("No plan template found.");
+
+  const builtinTemplates = await db.exerciseTemplates.toArray();
+  const customExercisesRaw: CustomExercise[] = await db.customExercises
+    .where("userId").equals(activeUserId).toArray();
+  const exTemplates: ExerciseTemplate[] = [
+    ...builtinTemplates,
+    ...customExercisesRaw.map((cx) => ({
+      id: cx.id,
+      name: cx.name,
+      defaultSets: cx.type === "compound" ? 4 : 3,
+      repRange: cx.type === "compound" ? { min: 6, max: 10 } : { min: 10, max: 15 },
+    })),
+  ];
+
+  const completedDays = currentWeek.days.filter((d) => d.isComplete);
+  const incompleteDays = currentWeek.days
+    .filter((d) => !d.isComplete)
+    .sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+
+  // The date slots we will fill (up to targetRemainingCount)
+  const slotDates = incompleteDays
+    .slice(0, targetRemainingCount)
+    .map((d) => d.dateISO);
+
+  if (slotDates.length === 0) return currentWeek.days;
+
+  // Build the full set of muscle buckets already trained this week.
+  // Use both title-based mapping and actual exercise names for maximum accuracy.
+  const coveredMuscles = new Set<MuscleBucket>();
+  for (const day of completedDays) {
+    // Title-based coverage
+    for (const m of musclesFromDayTitle(day.title)) coveredMuscles.add(m);
+    // Exercise-name-based coverage (catches custom/unusual day titles)
+    for (const ex of day.exercises) {
+      const bucket = classifyMuscleBucket(ex.name);
+      if (bucket !== "other") coveredMuscles.add(bucket);
+    }
+  }
+
+  // Generate 3 template days — covers push, lower+back, and pull archetypes
+  const tempWeek = await generateWeekFromTemplate(
+    planTemplate,
+    exTemplates,
+    currentWeek.weekNumber,
+    currentWeek.startDateISO,
+    currentWeek,
+    activeUserId,
+    3
+  );
+
+  // Score each generated day: higher = more untrained muscle coverage.
+  // Count exercises that hit muscles NOT yet covered this week.
+  function scoreDay(day: WorkoutDay): number {
+    let score = 0;
+    const seenInDay = new Set<MuscleBucket>();
+    for (const ex of day.exercises) {
+      const bucket = classifyMuscleBucket(ex.name);
+      if (bucket !== "other" && !coveredMuscles.has(bucket) && !seenInDay.has(bucket)) {
+        score += 1;
+        seenInDay.add(bucket);
+      }
+    }
+    return score;
+  }
+
+  // Sort: highest untrained-muscle score first
+  const prioritized = [...tempWeek.days].sort((a, b) => scoreDay(b) - scoreDay(a));
+
+  // Take the first N days, remap dates to the available incomplete slots
+  const newDays: WorkoutDay[] = prioritized
+    .slice(0, slotDates.length)
+    .map((day, i) => ({
+      ...day,
+      id: crypto.randomUUID(),
+      dateISO: slotDates[i] ?? day.dateISO,
+      isComplete: false,
+    }));
+
+  return [...completedDays, ...newDays].sort((a, b) =>
+    a.dateISO.localeCompare(b.dateISO)
+  );
+}
+
