@@ -115,9 +115,6 @@ User Action
               │
               └─► On failure → offlineQueue (Dexie) → retry on reconnect
 ```
-
-On login: `syncFromSupabase()` pulls all user data into local Dexie, then app runs locally.
-
 ## Version History
 
 | Version | Highlights |
@@ -129,9 +126,3 @@ On login: `syncFromSupabase()` pulls all user data into local Dexie, then app ru
 | v0.5 | Goal↔weight sync, goal-reached banner, exercise history charts, data export/import |
 | v0.4 | Profile system, equipment logic, cardio, exercise meta |
 | v0.3 | Dynamic week generation, notes-based adjustment, unit toggle, weight tracker |
-
-## Notes
-
-- The `anon` Supabase key is safe to expose in the frontend — RLS policies enforce per-user data access.
-- The `service_role` key must never be used in frontend code.
-- Local Dexie DB name is `cutGymDB` (unchanged from earlier versions to preserve existing local data).
