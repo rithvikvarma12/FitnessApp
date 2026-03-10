@@ -575,6 +575,8 @@ export default function PlanPage() {
         <>
           <hr />
           <div style={{
+            width: "100%",
+            boxSizing: "border-box",
             background: "rgba(255,255,255,0.02)",
             border: "1px solid var(--border-glass)",
             borderRadius: "var(--radius-md)",
@@ -582,11 +584,11 @@ export default function PlanPage() {
           }}>
             <h3 style={{ marginBottom: 10 }}>End-of-week notes</h3>
 
-            <div className="row">
-              <div className="col">
+            <div className="row" style={{ width: "100%", boxSizing: "border-box" }}>
+              <div className="col" style={{ width: "100%", boxSizing: "border-box", minWidth: 0 }}>
                 {/* Deload suggestion banner */}
                 {deloadSuggestion && dismissedDeloadForWeek !== selected?.id && (
-                  <div style={{ padding: "10px 12px", marginBottom: 10, borderRadius: "var(--radius-md)", border: "1px solid rgba(249,115,22,0.35)", background: "rgba(249,115,22,0.07)" }}>
+                  <div style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", marginBottom: 10, borderRadius: "var(--radius-md)", border: "1px solid rgba(249,115,22,0.35)", background: "rgba(249,115,22,0.07)" }}>
                     <div style={{ fontSize: 12, color: "#f97316", fontWeight: 600, marginBottom: 6 }}>Deload suggested</div>
                     <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 8 }}>{deloadSuggestion.reason}</div>
                     <div style={{ display: "flex", gap: 6 }}>
@@ -631,7 +633,7 @@ export default function PlanPage() {
                 <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, marginTop: 8 }}>Notes (used to generate next week)</div>
                 <textarea
                   ref={notesRef}
-                  style={{ minHeight: 80 }}
+                  style={{ width: "100%", boxSizing: "border-box", minHeight: 120, resize: "vertical" }}
                   placeholder='"3 days next week", "Travel Tue–Thu", "Back sore—go lighter"'
                   value={selected.notes ?? ""}
                   onChange={async (e) => {
@@ -672,9 +674,9 @@ export default function PlanPage() {
                 )}
               </div>
 
-              <div style={{ width: 160, flexShrink: 0 }}>
+              <div style={{ width: "100%", boxSizing: "border-box" }}>
                 <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Next week days</div>
-                <select
+                <select style={{ width: "100%", boxSizing: "border-box" }}
                   value={selected.nextWeekDays ?? ""}
                   onChange={async (e) => {
                     const raw = e.target.value;
