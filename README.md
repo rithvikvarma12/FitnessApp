@@ -118,24 +118,6 @@ User Action
 
 On login: `syncFromSupabase()` pulls all user data into local Dexie, then app runs locally.
 
-## Installation
-
-```bash
-npm install
-npm run dev
-```
-
-```bash
-npm run build   # production build
-```
-
-## Environment Variables
-
-```
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
 ## Version History
 
 | Version | Highlights |
