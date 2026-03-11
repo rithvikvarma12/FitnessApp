@@ -10,9 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.0",
     "@capacitor/android": "^8.2.0",
     "@capacitor/core": "^8.2.0",
+    "@capacitor/haptics": "^8.0.1",
     "@capacitor/ios": "^8.2.0",
+    "@capacitor/splash-screen": "^8.0.1",
     "@supabase/supabase-js": "^2.98.0",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",

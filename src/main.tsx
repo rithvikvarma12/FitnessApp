@@ -5,6 +5,11 @@ import "./styles.css";
 import "./progress.css";
 import { registerServiceWorker } from "./pwa/registerSW";
 import { processQueue } from "./lib/offlineQueue";
+import { SplashScreen } from '@capacitor/splash-screen';
+
+setTimeout(() => {
+  SplashScreen.hide();
+}, 2500);
 
 if (import.meta.env.PROD) { registerServiceWorker(); }
 void processQueue();

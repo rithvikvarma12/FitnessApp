@@ -2,6 +2,7 @@ import type { PlannedExercise, SetEntry } from "../db/types";
 import type { Unit } from "../services/units";
 import { toDisplay, fromDisplay } from "../services/units";
 import RestTimer from "./RestTimer";
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 function lastNonEmptyActualWeightKg(ex: PlannedExercise): number | undefined {
   for (let i = ex.sets.length - 1; i >= 0; i -= 1) {
@@ -181,7 +182,12 @@ export default function ExerciseCard({
                 type="button"
                 className={`set-check-btn ${s.completed ? "done" : ""}`}
                 disabled={isLocked}
-                onClick={() => onSetUpdate(dayId, ex.id, s.setNumber, { completed: !s.completed })}
+                onClick={async () => {
+                  if (!s.completed) {
+                    try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+                  }
+                  onSetUpdate(dayId, ex.id, s.setNumber, { completed: !s.completed });
+                }}
                 aria-label={s.completed ? "Mark incomplete" : "Mark complete"}
               >
                 {s.completed ? "✓" : ""}

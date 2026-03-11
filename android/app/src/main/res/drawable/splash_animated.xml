@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_dumbbell">
+    <target
+        android:name="dumbbell"
+        android:animation="@animator/dumbbell_bounce" />
+    <target
+        android:name="hand"
+        android:animation="@animator/dumbbell_bounce" />
+</animated-vector>

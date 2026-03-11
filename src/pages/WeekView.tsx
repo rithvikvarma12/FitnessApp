@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { KeepAwake } from '@capacitor-community/keep-awake';
 import { useLiveQuery } from "dexie-react-hooks";
 import { classifyCompound, db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
@@ -270,6 +271,14 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     exerciseTemplateIdByName,
     exerciseMetaByTemplateId
   ]);
+
+  // Keep screen awake while on this page
+  useEffect(() => {
+    KeepAwake.keepAwake().catch(() => {});
+    return () => {
+      KeepAwake.allowSleep().catch(() => {});
+    };
+  }, []);
 
   // Cleanup timer on unmount
   useEffect(() => {

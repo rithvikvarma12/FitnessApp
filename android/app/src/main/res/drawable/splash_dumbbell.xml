@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Dumbbell bar -->
+    <path
+        android:name="dumbbell"
+        android:fillColor="#FFFFFF"
+        android:pathData="
+        M28,52 L80,52 L80,56 L28,56 Z
+        M18,44 L30,44 L30,64 L18,64 Z
+        M14,40 L22,40 L22,68 L14,68 Z
+        M78,44 L90,44 L90,64 L78,64 Z
+        M86,40 L94,40 L94,68 L86,68 Z" />
+
+    <!-- Hand/arm below dumbbell -->
+    <path
+        android:name="hand"
+        android:fillColor="#5A9BFF"
+        android:pathData="
+        M42,68 L66,68 L68,76 Q65,82 54,82 Q43,82 40,76 Z
+        M46,76 L50,76 L50,72 L46,72 Z
+        M52,76 L56,76 L56,70 L52,70 Z
+        M58,76 L62,76 L62,72 L58,72 Z" />
+
+</vector>
