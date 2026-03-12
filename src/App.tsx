@@ -15,6 +15,7 @@ import NutritionPage from "./pages/NutritionPage";
 import AuthPage from "./pages/AuthPage";
 import { supabase } from "./lib/supabase";
 import { syncFromSupabase } from "./lib/syncFromSupabase";
+import { initPushNotifications } from "./lib/notifications";
 import type { Session } from "@supabase/supabase-js";
 
 type Tab = "plan" | "weight" | "progress" | "nutrition" | "profile";
@@ -104,6 +105,7 @@ export default function App() {
       // ✅ v0.3.1: disable auto Week 1 creation so Quick Start can run
       // await createFirstWeekIfMissing();
       setReady(true);
+      await initPushNotifications();
     })();
 
     supabase.auth.getSession().then(({ data }) => {
