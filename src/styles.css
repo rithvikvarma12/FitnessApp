@@ -1473,3 +1473,45 @@ body,
   display: grid;
   gap: 10px;
 }
+
+/* ── Mobile (≤480px) density improvements ───────────────────────────────── */
+@media (max-width: 480px) {
+  body {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* Cards — more breathing room */
+  .card {
+    padding: 16px;
+  }
+
+  .dayCard {
+    padding: 14px 16px;
+  }
+
+  .stat-box {
+    padding: 11px 12px;
+  }
+
+  /* Exercise rows — more vertical spacing */
+  .list {
+    gap: 14px;
+  }
+
+  /* Set cards — more padding and row gap */
+  .setDataRow {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  /* Bottom nav — slightly taller tap targets */
+  .bottom-nav {
+    padding: 10px 0 env(safe-area-inset-bottom, 16px);
+  }
+
+  .bottom-nav-item {
+    padding: 8px 16px;
+    gap: 4px;
+  }
+}

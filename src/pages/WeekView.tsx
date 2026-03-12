@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { KeepAwake } from '@capacitor-community/keep-awake';
 import { useLiveQuery } from "dexie-react-hooks";
 import { classifyCompound, db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
@@ -271,6 +272,14 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     exerciseMetaByTemplateId
   ]);
 
+  // Keep screen awake while on this page
+  useEffect(() => {
+    KeepAwake.keepAwake().catch(() => {});
+    return () => {
+      KeepAwake.allowSleep().catch(() => {});
+    };
+  }, []);
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -349,7 +358,7 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     }
   }
 
-  function confirmDayComplete(fatigueRating?: number) {
+  async function confirmDayComplete(fatigueRating?: number) {
     if (!sessionSummaryDayId) return;
     const dayId = sessionSummaryDayId;
     setSessionSummaryDayId(null);
@@ -364,7 +373,17 @@ export default function WeekView({ week }: { week: WeekPlan }) {
         d.id === dayId ? { ...d, isComplete: true, workoutDurationMinutes: durationMinutes, ...(fatigueRating !== undefined ? { fatigueRating } : {}) } : d
       )
     };
-    void updateWeek(updated);
+    await updateWeek(updated);
+    const allDone = updated.days.every((d) => d.isComplete);
+    if (allDone) {
+      try {
+        await supabase.functions.invoke('send-notifications', {
+          body: { type: 'week_complete' }
+        });
+      } catch (e) {
+        console.error('Failed to send week complete notification:', e);
+      }
+    }
   }
 
   function updateSet(dayId: string, exId: string, setNumber: number, patch: Partial<SetEntry>) {

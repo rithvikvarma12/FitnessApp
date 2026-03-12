@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "829987695870",
+    "project_id": "trainlab-e4002",
+    "storage_bucket": "trainlab-e4002.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829987695870:android:2844e3681eb309608ec9af",
+        "android_client_info": {
+          "package_name": "com.trainlab.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBH9dEU2urJ1WWRvDO0DDo-_qtq1wWmeV4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

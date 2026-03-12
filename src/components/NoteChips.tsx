@@ -156,7 +156,7 @@ export default function NoteChips({ chips, onChange, disabled, injuries, onUpdat
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: openFollowUp ? 8 : 0, scrollbarWidth: "none" }}>
+      <div style={{ display: "flex", gap: 6, width: "100%", overflowX: "auto", flexWrap: "nowrap", WebkitOverflowScrolling: "touch", paddingBottom: 4, marginBottom: openFollowUp ? 8 : 0, scrollbarWidth: "none" }}>
         {CHIP_CONFIG.map((cfg) => {
           const active = isActive(cfg.type);
           const pending = isPending(cfg.type);
