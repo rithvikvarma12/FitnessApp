@@ -90,7 +90,7 @@ export function isGymOnlyExercise(name: string): boolean {
     "seated cable", "pec fly machine", "leg extension", "leg curl",
     "hack squat", "pec deck", "smith machine", "barbell back squat",
     "barbell front squat", "barbell bent-over row", "t-bar row",
-    "deadlift", "romanian deadlift (barbell)", "barbell overhead press",
+    "romanian deadlift (barbell)", "barbell overhead press",
     "skull crushers", "close-grip bench press", "cable crunch",
     "hanging leg raise", "ab wheel", "seated calf", "hip abduction machine",
     "hip thrust (barbell)"
@@ -122,32 +122,22 @@ export const HOME_EQUIPMENT_TAGS: Record<string, string> = {
   pull_up_bar:      "pull_up_bar",
 };
 
-/** Check if an exercise can be performed given a set of available equipment tags */
+/** Check if an exercise can be performed given a set of available equipment tags.
+ *  Call only when meta.equipmentTags is non-empty (caller must guard). */
 export function isCompatibleWithTags(
-  meta: ExerciseMeta | undefined,
+  meta: ExerciseMeta,
   availableTags: Set<string>,
   equipment: EquipmentType
 ): boolean {
   if (equipment === "gym") return true;
 
-  // No meta → fall back to name-based heuristic
-  if (!meta?.equipmentTags || meta.equipmentTags.length === 0) {
-    return !isGymOnlyExercise(meta ? "" : "") && isHomeFriendly(meta?.exerciseTemplateId ?? "");
-  }
-
-  const tags = meta.equipmentTags;
+  const tags = meta.equipmentTags!;
 
   // Gym-only if any tag requires gym machine/cable
   if (tags.some(t => GYM_ONLY_TAGS.has(t))) return false;
 
-  // "bodyweight" exercises are always compatible
-  if (tags.every(t => t === "bodyweight")) return true;
-
-  // Check if user has the required equipment
-  return tags.every(t => {
-    if (t === "bodyweight") return true;
-    return availableTags.has(t);
-  });
+  // Check if user has all required equipment (bodyweight is always available)
+  return tags.every(t => t === "bodyweight" || availableTags.has(t));
 }
 
 /** Build available tags set from a UserProfile's homeEquipment list */
@@ -217,17 +207,17 @@ function findExistingExerciseIdByNames(
   candidateNames: string[],
   excludedIds: Set<string>
 ): string | undefined {
+  // Note: exTemplates is expected to be pre-filtered (isAllowed), so no gym-only check here
   if (candidateNames.length === 0) return undefined;
   const lowerCandidates = candidateNames.map((x) => x.toLowerCase());
   const exact = exTemplates.find((ex) =>
     !excludedIds.has(ex.id) && lowerCandidates.includes(ex.name.toLowerCase())
   );
-  if (exact && !isGymOnlyExercise(exact.name)) return exact.id;
+  if (exact) return exact.id;
   for (const candidate of lowerCandidates) {
     const partial = exTemplates.find((ex) =>
       !excludedIds.has(ex.id) &&
-      ex.name.toLowerCase().includes(candidate) &&
-      !isGymOnlyExercise(ex.name)
+      ex.name.toLowerCase().includes(candidate)
     );
     if (partial) return partial.id;
   }
