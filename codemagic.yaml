@@ -12,7 +12,6 @@ workflows:
         BUNDLE_ID: "com.trainlab.app"
       node: v22
       xcode: latest
-      cocoapods: default
     triggering:
       events:
         - push
@@ -30,9 +29,6 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
-      - name: Install CocoaPods
-        script: |
-          cd ios/App && pod install
       - name: Fetch signing files
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
