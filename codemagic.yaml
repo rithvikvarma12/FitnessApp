@@ -21,7 +21,7 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: main
+        - pattern: feat/social-login
           include: true
           source: true
     scripts:
