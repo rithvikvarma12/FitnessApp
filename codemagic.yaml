@@ -7,8 +7,6 @@ workflows:
       app_store_connect: Codemagic
     environment:
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.trainlab.app
         certificates:
           - distribution_cert
         provisioning_profiles:
