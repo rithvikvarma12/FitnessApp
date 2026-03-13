@@ -69,13 +69,14 @@ export function classifyMuscleBucket(name: string): MuscleBucket {
 
   // Shoulders — upright row / face pull / pull-apart must come before "row" → back
   if (n.includes("upright row") || n.includes("face pull") || n.includes("pull-apart")) return "shoulders";
+  if (n.includes("arnold press") || n.includes("overhead press") || n.includes("kettlebell press")) return "shoulders";
   if (n.includes("pike push-up") || n.includes("pike push up")) return "shoulders";
   if (n.includes("dumbbell shoulder press")) return "shoulders";
   if (MUSCLE_KEYWORDS.shoulders.some((k) => n.includes(k))) return "shoulders";
 
   // Chest
   if (n.includes("push-up") || n.includes("push up")) return "chest";
-  if (n.includes("floor press")) return "chest";
+  if (n.includes("floor press") || n.includes("incline press")) return "chest";
   if (MUSCLE_KEYWORDS.chest.some((k) => n.includes(k))) return "chest";
 
   // Back — pull-ups, chin-ups, pullover, then keyword matches
