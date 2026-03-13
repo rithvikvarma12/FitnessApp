@@ -622,8 +622,8 @@ async function generateWeekFromTemplate(
     }
     // 2. Insert Hip Thrust or Glute Bridge at start of Lower days
     const gluteTemplate =
-      exTemplates.find((e) => e.name.toLowerCase() === "hip thrust") ??
-      exTemplates.find((e) => e.name.toLowerCase() === "glute bridge");
+      exTemplates.find((e) => e.name.toLowerCase().includes("hip thrust")) ??
+      exTemplates.find((e) => e.name.toLowerCase().includes("glute bridge"));
     if (gluteTemplate) {
       for (const day of days) {
         if (day.title.toLowerCase().includes("lower") && !day.exercises.some((e) => e.name.toLowerCase() === gluteTemplate.name.toLowerCase())) {

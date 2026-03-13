@@ -620,6 +620,18 @@ function selectExercisesForDay(
     }
   }
 
+  // Guarantee: each primary group must have at least one exercise.
+  // Runs after target-fill phases so it doesn't inflate counts unnecessarily.
+  for (const group of config.primaryGroups) {
+    const hasRep = (pools[group] ?? []).some((c) => selectedIds.has(c.id));
+    if (!hasRep) {
+      const candidate =
+        (pools[group] ?? []).find((c) => !selectedIds.has(c.id) && !selectedNames.has(c.normalizedName)) ??
+        (pools[group] ?? []).find((c) => !selectedIds.has(c.id));
+      if (candidate) pushCandidate(candidate, false); // week-duplicate OK
+    }
+  }
+
   for (const group of allowedGroups) {
     const pool = pools[group] ?? [];
     let ptr = fallbackPointers.get(group) ?? 0;
