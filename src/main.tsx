@@ -6,8 +6,10 @@ import "./progress.css";
 import { registerServiceWorker } from "./pwa/registerSW";
 import { processQueue } from "./lib/offlineQueue";
 import { SplashScreen } from '@capacitor/splash-screen';
+import { initSocialLogin } from './lib/socialAuth';
 
 SplashScreen.hide();
+void initSocialLogin();
 
 if (import.meta.env.PROD) { registerServiceWorker(); }
 void processQueue();
