@@ -28,19 +28,53 @@ export function calculateTDEE(
 
 // ─── Caloric Target ───────────────────────────────────────────────────────────
 
-export function caloricTarget(tdee: number, goalMode: "cut" | "maintain" | "bulk"): number {
-  if (goalMode === "cut") return Math.max(1200, tdee - 500);
-  if (goalMode === "bulk") return tdee + 300;
+export function caloricTarget(
+  tdee: number,
+  goalMode: "cut" | "maintain" | "bulk",
+  gender: "male" | "female"
+): number {
+  if (goalMode === "cut") {
+    const deficit = gender === "female" ? 400 : 500;
+    const minimum = gender === "female" ? 1200 : 1500;
+    return Math.max(minimum, tdee - deficit);
+  }
+  if (goalMode === "bulk") return tdee + (gender === "female" ? 200 : 300);
   return tdee;
 }
 
-// ─── Macro Split ──────────────────────────────────────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
-const MACRO_SPLIT: Record<"cut" | "maintain" | "bulk", { protein: number; carbs: number; fat: number }> = {
-  cut:      { protein: 0.40, carbs: 0.35, fat: 0.25 },
-  maintain: { protein: 0.30, carbs: 0.40, fat: 0.30 },
-  bulk:     { protein: 0.25, carbs: 0.50, fat: 0.25 },
-};
+function proteinRateGPerKg(goalMode: "cut" | "maintain" | "bulk", gender: "male" | "female"): number {
+  if (gender === "male") {
+    if (goalMode === "cut")  return 2.3;
+    if (goalMode === "bulk") return 1.8;
+    return 2.0;
+  }
+  if (goalMode === "cut") return 2.0;
+  return 1.6; // female maintain or bulk
+}
+
+function carbFatRatio(
+  goalMode: "cut" | "maintain" | "bulk",
+  gender: "male" | "female"
+): { carbs: number; fat: number } {
+  if (gender === "female") {
+    if (goalMode === "cut")      return { carbs: 0.45, fat: 0.55 };
+    if (goalMode === "bulk")     return { carbs: 0.55, fat: 0.45 };
+    return { carbs: 0.50, fat: 0.50 };
+  }
+  if (goalMode === "cut")        return { carbs: 0.55, fat: 0.45 };
+  if (goalMode === "bulk")       return { carbs: 0.65, fat: 0.35 };
+  return { carbs: 0.60, fat: 0.40 };
+}
+
+function fatFloorGrams(weightKg: number, calories: number, gender: "male" | "female"): number {
+  const perKg   = gender === "female" ? 0.8 : 0.6;
+  const pctCals = gender === "female" ? 0.25 : 0.20;
+  return Math.ceil(Math.max(perKg * weightKg, (pctCals * calories) / 9));
+}
+
+// ─── Macro Split ──────────────────────────────────────────────────────────────
 
 export function calculateMacros(
   tdee: number,
@@ -48,20 +82,24 @@ export function calculateMacros(
   gender: "male" | "female",
   weightKg: number
 ): { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number } {
-  const calories = caloricTarget(tdee, goalMode);
-  const proteinGrams = Math.round(weightKg * (gender === "male" ? 2.0 : 1.6));
-  const proteinCals = proteinGrams * 4;
-  const remaining = Math.max(0, calories - proteinCals);
-  const split = MACRO_SPLIT[goalMode];
-  const nonProteinRatio = split.carbs + split.fat;
-  const carbsRatio = nonProteinRatio > 0 ? split.carbs / nonProteinRatio : 0.6;
-  const fatRatio  = nonProteinRatio > 0 ? split.fat  / nonProteinRatio : 0.4;
-  return {
-    calories,
-    proteinGrams,
-    carbsGrams: Math.round((remaining * carbsRatio) / 4),
-    fatGrams:   Math.round((remaining * fatRatio)  / 9),
-  };
+  const calories     = caloricTarget(tdee, goalMode, gender);
+  const proteinGrams = Math.round(weightKg * proteinRateGPerKg(goalMode, gender));
+  const proteinCals  = proteinGrams * 4;
+  const remaining    = Math.max(0, calories - proteinCals);
+
+  const ratio    = carbFatRatio(goalMode, gender);
+  let carbsGrams = Math.round((remaining * ratio.carbs) / 4);
+  let fatGrams   = Math.round((remaining * ratio.fat)   / 9);
+
+  // Apply fat floor — if ratio gives less than the minimum, bump fat and reduce carbs
+  const fatFloor = fatFloorGrams(weightKg, calories, gender);
+  if (fatGrams < fatFloor) {
+    const extraFatCals = (fatFloor - fatGrams) * 9;
+    fatGrams   = fatFloor;
+    carbsGrams = Math.max(0, Math.round(carbsGrams - extraFatCals / 4));
+  }
+
+  return { calories, proteinGrams, carbsGrams, fatGrams };
 }
 
 // ─── Full Settings Builder ────────────────────────────────────────────────────
