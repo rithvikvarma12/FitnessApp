@@ -6,6 +6,13 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.trainlab.app
+        certificates:
+          - distribution_cert
+        provisioning_profiles:
+          - trainlab_appstore
       vars:
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
@@ -31,138 +38,16 @@ workflows:
           npx cap sync ios
       - name: Set up code signing
         script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-
-          echo "=== Certificates in keychain ==="
-          security find-identity -v -p codesigning
-
-          echo "=== Provisioning profiles ==="
-          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" || echo "No profiles directory"
-      - name: Configure signing in Xcode project
-        script: |
-          # Get team ID and profile info
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          PROFILE_PATH=$(ls "$PROFILES_DIR"/*.mobileprovision 2>/dev/null | head -1)
-
-          if [ -z "$PROFILE_PATH" ]; then
-            echo "ERROR: No provisioning profile found"
-            exit 1
-          fi
-
-          PROFILE_CONTENT=$(security cms -D -i "$PROFILE_PATH")
-          TEAM_ID=$(echo "$PROFILE_CONTENT" | /usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin)
-          PROFILE_UUID=$(echo "$PROFILE_CONTENT" | /usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin)
-          PROFILE_NAME=$(echo "$PROFILE_CONTENT" | /usr/libexec/PlistBuddy -c "Print Name" /dev/stdin)
-          IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Distribution" | head -1 | awk -F'"' '{print $2}')
-
-          echo "Team ID: $TEAM_ID"
-          echo "Profile UUID: $PROFILE_UUID"
-          echo "Profile Name: $PROFILE_NAME"
-          echo "Identity: $IDENTITY"
-
-          if [ -z "$IDENTITY" ]; then
-            echo "ERROR: No signing identity found"
-            security find-identity -v -p codesigning
-            exit 1
-          fi
-
-          # Write these to CM_ENV for the build step
-          echo "TEAM_ID=$TEAM_ID" >> $CM_ENV
-          echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
-          echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
-          echo "IDENTITY=$IDENTITY" >> $CM_ENV
-
-          # Directly modify the pbxproj to set signing
-          PBXPROJ="$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
-
-          # Set manual signing
-          sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g" "$PBXPROJ"
-          sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$PBXPROJ"
-          sed -i '' "s/DEVELOPMENT_TEAM = \"\"/DEVELOPMENT_TEAM = $TEAM_ID/g" "$PBXPROJ"
-
-          # Add provisioning profile to all build configurations
-          python3 << PYEOF
-          import re
-
-          with open("$PBXPROJ", "r") as f:
-              content = f.read()
-
-          # Replace any existing PROVISIONING_PROFILE settings
-          content = re.sub(
-              r'PROVISIONING_PROFILE_SPECIFIER = ".*?";',
-              'PROVISIONING_PROFILE_SPECIFIER = "'"$PROFILE_NAME"'";',
-              content
-          )
-
-          # For build settings that have CODE_SIGN_IDENTITY
-          content = re.sub(
-              r'"CODE_SIGN_IDENTITY(\[sdk=iphoneos\*\])?" = ".*?";',
-              '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "'"$IDENTITY"'";',
-              content
-          )
-
-          # Add PROVISIONING_PROFILE_SPECIFIER after each CODE_SIGN_STYLE = Manual if not present
-          if 'PROVISIONING_PROFILE_SPECIFIER' not in content:
-              content = content.replace(
-                  'CODE_SIGN_STYLE = Manual;',
-                  'CODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = '"$TEAM_ID"';\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "'"$PROFILE_NAME"'";'
-              )
-
-          with open("$PBXPROJ", "w") as f:
-              f.write(content)
-
-          print("pbxproj updated successfully")
-          PYEOF
-
-          echo "=== Verify signing settings ==="
-          grep -A2 "CODE_SIGN_STYLE" "$PBXPROJ" | head -20
+          xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
       - name: Increment build number
         script: |
           cd $CM_BUILD_DIR/ios/App
           agvtool new-version -all $(($(app-store-connect get-latest-build-number "$BUNDLE_ID" || echo "0") + 1))
       - name: Build IPA
         script: |
-          xcodebuild -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath "$CM_BUILD_DIR/build/ios/App.xcarchive" \
-            -destination "generic/platform=iOS" \
-            archive \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            "CODE_SIGN_IDENTITY=$IDENTITY" \
-            "PROVISIONING_PROFILE_SPECIFIER=$PROFILE_NAME" \
-            PROVISIONING_PROFILE="$PROFILE_UUID"
-
-          cat > exportOptions.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>teamID</key>
-            <string>$TEAM_ID</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>$BUNDLE_ID</key>
-              <string>$PROFILE_NAME</string>
-            </dict>
-          </dict>
-          </plist>
-          EOF
-
-          xcodebuild -exportArchive \
-            -archivePath "$CM_BUILD_DIR/build/ios/App.xcarchive" \
-            -exportPath "$CM_BUILD_DIR/build/ios/ipa" \
-            -exportOptionsPlist exportOptions.plist
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
