@@ -21,7 +21,7 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: feat/ios-codemagic-setup
+        - pattern: main
           include: true
           source: true
     scripts:
