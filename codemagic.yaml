@@ -34,8 +34,34 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
-          # Fix Windows backslashes in Package.swift (generated on Windows dev machine)
-          sed -i '' 's|\\\\|/|g' "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift"
+          # Strip all plugins from Package.swift — minimal base Capacitor only for debug build
+          cat > "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift" << 'PKGEOF'
+          // swift-tools-version: 5.9
+          import PackageDescription
+
+          // DO NOT MODIFY THIS FILE - managed by Capacitor CLI commands
+          let package = Package(
+              name: "CapApp-SPM",
+              platforms: [.iOS(.v15)],
+              products: [
+                  .library(
+                      name: "CapApp-SPM",
+                      targets: ["CapApp-SPM"])
+              ],
+              dependencies: [
+                  .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.2.0")
+              ],
+              targets: [
+                  .target(
+                      name: "CapApp-SPM",
+                      dependencies: [
+                          .product(name: "Capacitor", package: "capacitor-swift-pm"),
+                          .product(name: "Cordova", package: "capacitor-swift-pm")
+                      ]
+                  )
+              ]
+          )
+          PKGEOF
           echo "=== Package.swift after fix ==="
           cat "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift"
       - name: Check Xcode build environment
