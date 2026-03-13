@@ -36,7 +36,7 @@ workflows:
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
-          xcode-project use-profiles
+          xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
       - name: Increment build number
         script: |
           cd $CM_BUILD_DIR/ios/App
