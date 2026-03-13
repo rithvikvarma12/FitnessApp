@@ -34,7 +34,7 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
-          # Overwrite Package.swift with haptics + splash screen (adding plugins back one at a time)
+          # Overwrite Package.swift with haptics + splash screen + push notifications
           cat > "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift" << 'PKGEOF'
           // swift-tools-version: 5.9
           import PackageDescription
@@ -51,7 +51,8 @@ workflows:
               dependencies: [
                   .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.2.0"),
                   .package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics"),
-                  .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen")
+                  .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen"),
+                  .package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications")
               ],
               targets: [
                   .target(
@@ -60,7 +61,8 @@ workflows:
                           .product(name: "Capacitor", package: "capacitor-swift-pm"),
                           .product(name: "Cordova", package: "capacitor-swift-pm"),
                           .product(name: "CapacitorHaptics", package: "CapacitorHaptics"),
-                          .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen")
+                          .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
+                          .product(name: "CapacitorPushNotifications", package: "CapacitorPushNotifications")
                       ]
                   )
               ]
