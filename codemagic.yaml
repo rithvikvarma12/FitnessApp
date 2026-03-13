@@ -94,6 +94,22 @@ workflows:
 
           echo "=== Verify entitlements file exists ==="
           ls -la $CM_BUILD_DIR/ios/App/App/App.entitlements || echo "ENTITLEMENTS FILE MISSING"
+      - name: Verify entitlements setup
+        script: |
+          echo "=== Entitlements file contents ==="
+          cat $CM_BUILD_DIR/ios/App/App/App.entitlements
+          echo ""
+          echo "=== pbxproj entitlements references ==="
+          grep -i "entitlements" $CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj
+          echo ""
+          echo "=== Provisioning profile entitlements ==="
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_PATH=$(ls "$PROFILES_DIR"/*.mobileprovision 2>/dev/null | head -1)
+          if [ -n "$PROFILE_PATH" ]; then
+            security cms -D -i "$PROFILE_PATH" | grep -A 20 "Entitlements"
+          else
+            echo "No provisioning profile found"
+          fi
       - name: Set up code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
