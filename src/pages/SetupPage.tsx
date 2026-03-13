@@ -175,7 +175,7 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
       // Upsert full profile to Supabase now that setup is complete
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        supabase.from("user_profiles").upsert({
+        const { error: profileUpsertErr } = await supabase.from("user_profiles").upsert({
           id: profile.id,
           auth_id: session?.user?.id,
           name: profile.name ?? null,
@@ -196,7 +196,8 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
           gender: profile.gender ?? null,
           activity_multiplier: profile.activityMultiplier ?? null,
           created_at: profile.createdAtISO,
-        }).then(({ error }) => { if (error) console.error("Supabase profile upsert error:", error); });
+        });
+        if (profileUpsertErr) console.error("Supabase profile upsert error:", profileUpsertErr);
       } catch { /* ignore */ }
 
       // Auto-create nutrition settings from body stats

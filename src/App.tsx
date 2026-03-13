@@ -126,24 +126,55 @@ export default function App() {
       return;
     }
     setSupabaseProfile(undefined);
-    console.log('[AUTH] session.user.id:', session.user.id);
     supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", session.user.id)
       .maybeSingle()
       .then(async ({ data, error }) => {
-        console.log('[AUTH] profile query result:', data, error);
         if (error) console.error('Supabase profile error:', error);
         if (data) {
           await db.settings.put({ key: "activeUserId", value: data.id });
           await syncFromSupabase(data.id);
           setSupabaseProfile(data);
         } else {
-          // No profile found — log all profiles to diagnose auth_id mismatch
-          const allProfiles = await supabase.from("user_profiles").select("id, auth_id, name").limit(5);
-          console.log('[AUTH] all profiles in table:', allProfiles.data);
-          setSupabaseProfile(null);
+          // No Supabase profile found — check if there's a local profile we can recover
+          const localProfiles = await db.userProfiles.toArray();
+          if (localProfiles.length > 0) {
+            // Recover: upsert the local profile to Supabase with the current auth_id
+            const local = localProfiles[0];
+            const { error: upsertErr } = await supabase.from("user_profiles").upsert({
+              id: local.id,
+              auth_id: session.user.id,
+              name: local.name ?? null,
+              unit: local.unit,
+              days_per_week: local.daysPerWeek,
+              goal_mode: local.goalMode,
+              current_weight_kg: local.currentWeightKg ?? null,
+              target_weight_kg: local.targetWeightKg ?? null,
+              experience: local.experience,
+              equipment: local.equipment,
+              cardio_goal_auto: local.cardioGoalAuto,
+              cardio_type: local.cardioType,
+              cardio_sessions_per_week: local.cardioSessionsPerWeek,
+              cardio_minutes_per_session: local.cardioMinutesPerSession,
+              notes: local.notes ?? null,
+              height_cm: local.heightCm ?? null,
+              age: local.age ?? null,
+              gender: local.gender ?? null,
+              activity_multiplier: local.activityMultiplier ?? null,
+              created_at: local.createdAtISO,
+            });
+            if (upsertErr) {
+              console.error('Profile recovery upsert failed:', upsertErr);
+              setSupabaseProfile(null);
+            } else {
+              await db.settings.put({ key: "activeUserId", value: local.id });
+              setSupabaseProfile(local as unknown as Record<string, unknown>);
+            }
+          } else {
+            setSupabaseProfile(null);
+          }
         }
       });
   }, [session]);
