@@ -32,7 +32,7 @@ import {
   buildPlannedSetWeightsFromBase,
   type WeightUnit,
 } from "./progressionEngine";
-import { getExerciseExclusions, downgradeSeverity, getActiveInjuries } from "./injuryMemory";
+import { getExerciseExclusions, downgradeSeverity, getActiveInjuries, updateInjuryStatus } from "./injuryMemory";
 
 export { applyEquipmentToDayTemplates, remapDayTemplatesForTargetDays };
 
@@ -775,6 +775,21 @@ export async function generateNextWeek() {
 
   const activeInjuries = await getActiveInjuries(activeUserId);
 
+  // Natural language injury resolution: scan notes for recovery phrases before chip processing
+  const RECOVERY_PHRASES = [
+    "no more injury", "injury gone", "recovered", "healed",
+    "no longer hurting", "pain free", "pain gone", "feeling better",
+    "fully recovered", "injury resolved",
+  ];
+  const notesText = (latest?.notes ?? "").toLowerCase();
+  const injuriesCleared =
+    activeInjuries.length > 0 &&
+    RECOVERY_PHRASES.some((p) => notesText.includes(p));
+  if (injuriesCleared) {
+    await Promise.all(activeInjuries.map((inj) => updateInjuryStatus(inj.id, "resolved")));
+  }
+  const injuriesForPlan = injuriesCleared ? [] : activeInjuries;
+
   const nextWeekNumber = (latest?.weekNumber ?? 0) + 1;
   const nextStart = latest
     ? format(addDays(parseISO(latest.startDateISO), 7), "yyyy-MM-dd")
@@ -789,8 +804,15 @@ export async function generateNextWeek() {
     activeUserId,
     undefined,
     chips,
-    activeInjuries
+    injuriesForPlan
   );
+
+  if (injuriesCleared) {
+    newWeek.adaptations = [
+      "Injuries cleared based on notes — full exercise selection restored",
+      ...(newWeek.adaptations ?? []),
+    ];
+  }
 
   await db.weekPlans.add(newWeek);
   return newWeek;
