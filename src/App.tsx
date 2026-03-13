@@ -151,32 +151,12 @@ export default function App() {
   };
 
   if (!ready) {
-    return (
-      <>
-        <div className="ambient-bg">
-          <div className="ambient-blob ambient-blob--blue" />
-          <div className="ambient-blob ambient-blob--purple" />
-        </div>
-        <div className="container">
-          <div className="card">Loading…</div>
-        </div>
-      </>
-    );
+    return <></>;
   }
 
   // session === undefined means still loading; null means logged out
   if (session === undefined) {
-    return (
-      <>
-        <div className="ambient-bg">
-          <div className="ambient-blob ambient-blob--blue" />
-          <div className="ambient-blob ambient-blob--purple" />
-        </div>
-        <div className="container">
-          <div className="card">Loading…</div>
-        </div>
-      </>
-    );
+    return <></>;
   }
 
   if (session === null) {
@@ -193,17 +173,7 @@ export default function App() {
 
   // Still fetching the Supabase profile for this session
   if (supabaseProfile === undefined) {
-    return (
-      <>
-        <div className="ambient-bg">
-          <div className="ambient-blob ambient-blob--blue" />
-          <div className="ambient-blob ambient-blob--purple" />
-        </div>
-        <div className="container">
-          <div className="card">Loading…</div>
-        </div>
-      </>
-    );
+    return <></>;
   }
 
   const showWelcome = (!activeUserId || (profiles?.length ?? 0) === 0) && !showSetup;
