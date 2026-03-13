@@ -6,13 +6,10 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.trainlab.app
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
-        APP_STORE_APP_ID: 6760516596
+        BUNDLE_ID: "com.trainlab.app"
       node: v20
       xcode: latest
       cocoapods: default
@@ -36,17 +33,15 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios/App && pod install
-      - name: Create certificate and profile
+      - name: Fetch signing files
         script: |
-          app-store-connect certificates list --type IOS_DISTRIBUTION || \
-          app-store-connect certificates create --type IOS_DISTRIBUTION
-          app-store-connect fetch-signing-files "com.trainlab.app" \
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-      - name: Set up code signing
+      - name: Set up keychain and profiles
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "com.trainlab.app" \
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
@@ -54,8 +49,7 @@ workflows:
       - name: Increment build number
         script: |
           cd $CM_BUILD_DIR/ios/App
-          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APP_ID" || echo "0")
-          agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
+          agvtool new-version -all $(($(app-store-connect get-latest-build-number "$BUNDLE_ID" || echo "0") + 1))
       - name: Build IPA
         script: |
           xcode-project build-ipa \
