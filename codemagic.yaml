@@ -42,11 +42,21 @@ workflows:
           echo "=== Check ios/App/App/public ==="
           ls -la $CM_BUILD_DIR/ios/App/App/public/ 2>/dev/null | head -20 || echo "PUBLIC FOLDER MISSING"
           echo ""
+          echo "=== Check asset paths in index.html ==="
+          grep -o 'src="[^"]*"' $CM_BUILD_DIR/ios/App/App/public/index.html 2>/dev/null || echo "No src found"
+          grep -o 'href="[^"]*"' $CM_BUILD_DIR/ios/App/App/public/index.html 2>/dev/null || echo "No href found"
+          echo ""
           echo "=== Check capacitor.config.json ==="
           cat $CM_BUILD_DIR/ios/App/App/capacitor.config.json 2>/dev/null || echo "CONFIG JSON MISSING"
           echo ""
-          echo "=== Check index.html in public ==="
-          head -30 $CM_BUILD_DIR/ios/App/App/public/index.html 2>/dev/null || echo "INDEX.HTML MISSING"
+          echo "=== Capacitor native bridge files ==="
+          find $CM_BUILD_DIR/ios -name "native-bridge.js" -o -name "capacitor.js" 2>/dev/null | head -10
+          echo ""
+          echo "=== Full ios/App/App directory ==="
+          ls -laR $CM_BUILD_DIR/ios/App/App/ 2>/dev/null | head -60
+          echo ""
+          echo "=== project.pbxproj public references ==="
+          grep -c "public" $CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj 2>/dev/null || echo "No public references"
       - name: Set up code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
