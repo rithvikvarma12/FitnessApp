@@ -57,12 +57,24 @@ async function syncUserProfileToSupabase(p: import("../db/types").UserProfile) {
 }
 type GoalMode = "cut" | "maintain" | "bulk";
 type Equipment = "gym" | "home" | "minimal";
+type VolumePreference = "light" | "moderate" | "high";
+
+const HOME_EQUIPMENT_OPTIONS: { key: string; label: string }[] = [
+  { key: "dumbbells",        label: "Dumbbells" },
+  { key: "barbell",          label: "Barbell" },
+  { key: "kettlebell",       label: "Kettlebell" },
+  { key: "resistance_bands", label: "Resistance Bands" },
+  { key: "bench",            label: "Bench" },
+  { key: "pull_up_bar",      label: "Pull-Up Bar" },
+];
 
 type FormState = {
   goalMode: GoalMode;
   targetWeight: string;
   daysPerWeek: 3 | 4 | 5;
   equipment: Equipment;
+  homeEquipment: string[];
+  volumePreference: VolumePreference;
 };
 
 type BackupPayload = {
@@ -187,7 +199,9 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
       goalMode: resolveGoalMode(profile),
       targetWeight: typeof profile.targetWeightKg === "number" ? toDisplay(profile.targetWeightKg, unit).toFixed(1) : "",
       daysPerWeek: profile.daysPerWeek,
-      equipment: profile.equipment
+      equipment: profile.equipment,
+      homeEquipment: profile.homeEquipment ?? [],
+      volumePreference: profile.volumePreference ?? "moderate",
     };
   }, [profile, unit]);
 
@@ -267,7 +281,9 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
         goal: form.goalMode === "bulk" ? "gain" : form.goalMode,
         targetWeightKg,
         daysPerWeek: form.daysPerWeek,
-        equipment: form.equipment
+        equipment: form.equipment,
+        homeEquipment: form.equipment === "home" ? form.homeEquipment : undefined,
+        volumePreference: form.volumePreference,
       });
       db.userProfiles.get(activeUserId).then(p => { if (p) syncUserProfileToSupabase(p); });
 
@@ -502,10 +518,77 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
           >
             <option value="gym">Gym</option>
             <option value="home">Home</option>
-            <option value="minimal">Minimal</option>
+            <option value="minimal">Minimal (bodyweight only)</option>
           </select>
         </div>
       </div>
+
+      {/* Volume preference */}
+      <div style={{ marginTop: 10 }}>
+        {fieldLabel("Volume preference")}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {(["light", "moderate", "high"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setForm((prev) => (prev ? { ...prev, volumePreference: v } : prev))}
+              style={{
+                flex: "1 1 auto",
+                padding: "9px 12px",
+                fontSize: 12,
+                fontWeight: form.volumePreference === v ? 700 : 500,
+                borderRadius: "var(--radius-md)",
+                border: `1px solid ${form.volumePreference === v ? "var(--accent-blue)" : "var(--border)"}`,
+                background: form.volumePreference === v ? "rgba(59,130,246,0.12)" : "var(--surface)",
+                color: form.volumePreference === v ? "var(--accent-blue)" : "var(--text-secondary)",
+                cursor: "pointer",
+              }}
+            >
+              {v === "light" ? "Light (4 ex/day)" : v === "moderate" ? "Moderate (6 ex/day)" : "High (7 ex/day)"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Home equipment checklist */}
+      {form.equipment === "home" && (
+        <div style={{ marginTop: 10 }}>
+          {fieldLabel("Home equipment available")}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+            {HOME_EQUIPMENT_OPTIONS.map(({ key, label }) => {
+              const checked = form.homeEquipment.includes(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setForm((prev) => {
+                    if (!prev) return prev;
+                    const next = checked
+                      ? prev.homeEquipment.filter(k => k !== key)
+                      : [...prev.homeEquipment, key];
+                    return { ...prev, homeEquipment: next };
+                  })}
+                  style={{
+                    padding: "7px 12px",
+                    fontSize: 12,
+                    fontWeight: checked ? 700 : 500,
+                    borderRadius: "var(--radius-md)",
+                    border: `1px solid ${checked ? "var(--accent-green)" : "var(--border)"}`,
+                    background: checked ? "rgba(16,185,129,0.10)" : "var(--surface)",
+                    color: checked ? "var(--accent-green)" : "var(--text-secondary)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {checked ? "✓ " : ""}{label}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+            Only exercises matching your equipment will be programmed.
+          </div>
+        </div>
+      )}
 
       <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 10 }}>
         Current weight: {latestWeight ? `${toDisplay(latestWeight.weightKg, unit).toFixed(1)} ${unit}` : "No entries yet"}

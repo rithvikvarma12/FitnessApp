@@ -24,6 +24,9 @@ export type UserProfile = {
   age?: number;
   gender?: "male" | "female";
   activityMultiplier?: number;
+  // home equipment + volume (added in v1.2)
+  homeEquipment?: string[];
+  volumePreference?: "light" | "moderate" | "high";
 };
 
 export type NutritionSettings = {
@@ -80,6 +83,7 @@ export type ExerciseMeta = {
   secondaryMuscles?: string[];
   movementPattern: MovementPattern;
   equipment: ExerciseEquipment;
+  equipmentTags?: string[];
   type: ExerciseMetaType;
   description?: string;
   cues?: string[];

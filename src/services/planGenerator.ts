@@ -533,6 +533,10 @@ async function generateWeekFromTemplate(
   const userEquipment: EquipmentType = userProfile?.equipment ?? "gym";
   const goalMode: GoalMode = normalizeGoal(userProfile?.goalMode ?? userProfile?.goal);
   const exerciseCap = exerciseCapForGoal(goalMode);
+  const volumePreference = userProfile?.volumePreference;
+  const homeEquipment = userProfile?.homeEquipment;
+  const allMeta = await db.exerciseMeta.toArray();
+  const metaByTemplateId = new Map(allMeta.map(m => [m.exerciseTemplateId, m]));
 
   const activeChips = chips ?? [];
   const chipDays =
@@ -555,9 +559,9 @@ async function generateWeekFromTemplate(
     constraints.targetDays = chipDays;
   }
 
-  const chosenBase = remapDayTemplatesForTargetDays(plan, constraints.targetDays, exTemplates);
+  const chosenBase = remapDayTemplatesForTargetDays(plan, constraints.targetDays, exTemplates, volumePreference);
   const chosen = applyGenerationConstraintsToDayTemplates(chosenBase, plan, exTemplates, constraints);
-  const equipmentAdjusted = applyEquipmentToDayTemplates(chosen, exTemplates, effectiveEquipment);
+  const equipmentAdjusted = applyEquipmentToDayTemplates(chosen, exTemplates, effectiveEquipment, homeEquipment, metaByTemplateId);
   const minExercisesPerDay = constraints.targetDays === 5 ? 1 : 5;
   const finalizedTemplates = equipmentAdjusted
     .map((day) => dedupeAndRefillDayByName(day, exTemplates, effectiveEquipment, minExercisesPerDay))
