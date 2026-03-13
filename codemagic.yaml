@@ -34,6 +34,23 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
+      - name: Find Capacitor bridge
+        script: |
+          echo "=== Search for ALL capacitor/bridge related files ==="
+          find $CM_BUILD_DIR -name "native-bridge*" -o -name "capacitor*.js" 2>/dev/null | grep -v node_modules/.cache | head -20
+          echo ""
+          echo "=== Check node_modules capacitor core ==="
+          ls -la $CM_BUILD_DIR/node_modules/@capacitor/ios/ios/Capacitor/Capacitor/ 2>/dev/null | head -20 || echo "Not found at expected path"
+          echo ""
+          echo "=== Check SPM packages ==="
+          find $CM_BUILD_DIR/ios -name "*.swift" -path "*/Capacitor/*" 2>/dev/null | head -10
+          echo ""
+          echo "=== Check if bridge is embedded in SPM package ==="
+          find $CM_BUILD_DIR -path "*/capacitor-swift-pm/*" -name "*.js" 2>/dev/null | head -10
+          find $CM_BUILD_DIR -path "*/@capacitor/ios/*" -name "*.js" 2>/dev/null | head -10
+          echo ""
+          echo "=== Package.swift contents ==="
+          cat $CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift
       - name: Verify iOS web assets
         script: |
           echo "=== Check dist folder ==="
