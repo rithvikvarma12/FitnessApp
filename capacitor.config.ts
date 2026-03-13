@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.trainlab.app',
   appName: 'TrainLab',
   webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+    iosScheme: 'https',
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2500,
