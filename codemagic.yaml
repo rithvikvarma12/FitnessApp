@@ -53,7 +53,8 @@ workflows:
                   .package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics"),
                   .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen"),
                   .package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications"),
-                  .package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake")
+                  .package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake"),
+                  .package(name: "CapgoCapacitorSocialLogin", path: "../../../node_modules/@capgo/capacitor-social-login")
               ],
               targets: [
                   .target(
@@ -64,7 +65,8 @@ workflows:
                           .product(name: "CapacitorHaptics", package: "CapacitorHaptics"),
                           .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                           .product(name: "CapacitorPushNotifications", package: "CapacitorPushNotifications"),
-                          .product(name: "CapacitorCommunityKeepAwake", package: "CapacitorCommunityKeepAwake")
+                          .product(name: "CapacitorCommunityKeepAwake", package: "CapacitorCommunityKeepAwake"),
+                          .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin")
                       ]
                   )
               ]
@@ -72,6 +74,14 @@ workflows:
           PKGEOF
           echo "=== Package.swift after fix ==="
           cat "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift"
+      - name: Set entitlements
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          # Inject entitlements path into pbxproj for both Debug and Release configs
+          sed -i '' 's|CODE_SIGN_ENTITLEMENTS = "";|CODE_SIGN_ENTITLEMENTS = App/App.entitlements;|g' App.xcodeproj/project.pbxproj
+          sed -i '' 's|CODE_SIGN_ENTITLEMENTS = ""|CODE_SIGN_ENTITLEMENTS = "App/App.entitlements"|g' App.xcodeproj/project.pbxproj
+          echo "=== CODE_SIGN_ENTITLEMENTS after patch ==="
+          grep "CODE_SIGN_ENTITLEMENTS" App.xcodeproj/project.pbxproj
       - name: Set up code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
