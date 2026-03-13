@@ -79,18 +79,29 @@ workflows:
           cd $CM_BUILD_DIR/ios/App
           PBXPROJ="App.xcodeproj/project.pbxproj"
 
-          # Check if CODE_SIGN_ENTITLEMENTS already exists
-          if grep -q "CODE_SIGN_ENTITLEMENTS" "$PBXPROJ"; then
-            echo "CODE_SIGN_ENTITLEMENTS already exists, updating..."
-            sed -i '' 's|CODE_SIGN_ENTITLEMENTS = ".*";|CODE_SIGN_ENTITLEMENTS = "App/App.entitlements";|g' "$PBXPROJ"
-          else
-            echo "CODE_SIGN_ENTITLEMENTS not found, adding..."
-            # Add after each INFOPLIST_FILE line in build settings
-            sed -i '' 's|INFOPLIST_FILE = "App/Info.plist";|INFOPLIST_FILE = "App/Info.plist";\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = "App/App.entitlements";|g' "$PBXPROJ"
-          fi
+          # Use Python to reliably add CODE_SIGN_ENTITLEMENTS to all build configs
+          python3 << 'EOF'
+          import re
 
-          echo "=== Verify entitlements ==="
-          grep "CODE_SIGN_ENTITLEMENTS" "$PBXPROJ" || echo "WARNING: Still not found"
+          with open("App.xcodeproj/project.pbxproj", "r") as f:
+              content = f.read()
+
+          # Add CODE_SIGN_ENTITLEMENTS after every INFOPLIST_FILE occurrence in buildSettings
+          if "CODE_SIGN_ENTITLEMENTS" not in content:
+              content = re.sub(
+                  r'(INFOPLIST_FILE = [^;]+;)',
+                  r'\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = "App/App.entitlements";',
+                  content
+              )
+              with open("App.xcodeproj/project.pbxproj", "w") as f:
+                  f.write(content)
+              print("Added CODE_SIGN_ENTITLEMENTS to pbxproj")
+          else:
+              print("CODE_SIGN_ENTITLEMENTS already present")
+          EOF
+
+          echo "=== Verify ==="
+          grep "CODE_SIGN_ENTITLEMENTS" "$PBXPROJ" || echo "STILL NOT FOUND"
 
           echo "=== Verify entitlements file exists ==="
           ls -la $CM_BUILD_DIR/ios/App/App/App.entitlements || echo "ENTITLEMENTS FILE MISSING"
