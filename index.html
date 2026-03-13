@@ -9,6 +9,26 @@
     <title>TrainLab</title>
   </head>
   <body>
+    <script>
+      window.onerror = function(msg, url, line, col, err) {
+        document.body.style.background = '#1a1a2e';
+        document.body.style.color = '#ff6b6b';
+        document.body.style.padding = '20px';
+        document.body.style.fontFamily = 'monospace';
+        document.body.style.fontSize = '14px';
+        document.body.style.whiteSpace = 'pre-wrap';
+        document.body.innerHTML = 'ERROR:\n' + msg + '\n\nFile: ' + url + '\nLine: ' + line + '\n\nStack:\n' + (err && err.stack ? err.stack : 'no stack');
+      };
+      window.onunhandledrejection = function(e) {
+        document.body.style.background = '#1a1a2e';
+        document.body.style.color = '#ff6b6b';
+        document.body.style.padding = '20px';
+        document.body.style.fontFamily = 'monospace';
+        document.body.style.fontSize = '14px';
+        document.body.style.whiteSpace = 'pre-wrap';
+        document.body.innerHTML = 'UNHANDLED PROMISE:\n' + (e.reason && e.reason.stack ? e.reason.stack : e.reason);
+      };
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
