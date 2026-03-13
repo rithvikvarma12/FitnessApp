@@ -34,7 +34,7 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
-          # Strip all plugins from Package.swift — minimal base Capacitor only for debug build
+          # Overwrite Package.swift with haptics only (adding plugins back one at a time)
           cat > "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift" << 'PKGEOF'
           // swift-tools-version: 5.9
           import PackageDescription
@@ -49,14 +49,16 @@ workflows:
                       targets: ["CapApp-SPM"])
               ],
               dependencies: [
-                  .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.2.0")
+                  .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.2.0"),
+                  .package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics")
               ],
               targets: [
                   .target(
                       name: "CapApp-SPM",
                       dependencies: [
                           .product(name: "Capacitor", package: "capacitor-swift-pm"),
-                          .product(name: "Cordova", package: "capacitor-swift-pm")
+                          .product(name: "Cordova", package: "capacitor-swift-pm"),
+                          .product(name: "CapacitorHaptics", package: "CapacitorHaptics")
                       ]
                   )
               ]
@@ -64,55 +66,6 @@ workflows:
           PKGEOF
           echo "=== Package.swift after fix ==="
           cat "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift"
-      - name: Check Xcode build environment
-        script: |
-          xcodebuild -version
-          echo ""
-          echo "=== Check index.html has error catcher ==="
-          grep "onerror" $CM_BUILD_DIR/ios/App/App/public/index.html && echo "ERROR CATCHER PRESENT" || echo "ERROR CATCHER MISSING"
-          echo ""
-          echo "=== Full index.html ==="
-          cat $CM_BUILD_DIR/ios/App/App/public/index.html
-      - name: Find Capacitor bridge
-        script: |
-          echo "=== Search for ALL capacitor/bridge related files ==="
-          find $CM_BUILD_DIR -name "native-bridge*" -o -name "capacitor*.js" 2>/dev/null | grep -v node_modules/.cache | head -20
-          echo ""
-          echo "=== Check node_modules capacitor core ==="
-          ls -la $CM_BUILD_DIR/node_modules/@capacitor/ios/ios/Capacitor/Capacitor/ 2>/dev/null | head -20 || echo "Not found at expected path"
-          echo ""
-          echo "=== Check SPM packages ==="
-          find $CM_BUILD_DIR/ios -name "*.swift" -path "*/Capacitor/*" 2>/dev/null | head -10
-          echo ""
-          echo "=== Check if bridge is embedded in SPM package ==="
-          find $CM_BUILD_DIR -path "*/capacitor-swift-pm/*" -name "*.js" 2>/dev/null | head -10
-          find $CM_BUILD_DIR -path "*/@capacitor/ios/*" -name "*.js" 2>/dev/null | head -10
-          echo ""
-          echo "=== Package.swift contents ==="
-          cat $CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift
-      - name: Verify iOS web assets
-        script: |
-          echo "=== Check dist folder ==="
-          ls -la $CM_BUILD_DIR/dist/ | head -20
-          echo ""
-          echo "=== Check ios/App/App/public ==="
-          ls -la $CM_BUILD_DIR/ios/App/App/public/ 2>/dev/null | head -20 || echo "PUBLIC FOLDER MISSING"
-          echo ""
-          echo "=== Check asset paths in index.html ==="
-          grep -o 'src="[^"]*"' $CM_BUILD_DIR/ios/App/App/public/index.html 2>/dev/null || echo "No src found"
-          grep -o 'href="[^"]*"' $CM_BUILD_DIR/ios/App/App/public/index.html 2>/dev/null || echo "No href found"
-          echo ""
-          echo "=== Check capacitor.config.json ==="
-          cat $CM_BUILD_DIR/ios/App/App/capacitor.config.json 2>/dev/null || echo "CONFIG JSON MISSING"
-          echo ""
-          echo "=== Capacitor native bridge files ==="
-          find $CM_BUILD_DIR/ios -name "native-bridge.js" -o -name "capacitor.js" 2>/dev/null | head -10
-          echo ""
-          echo "=== Full ios/App/App directory ==="
-          ls -laR $CM_BUILD_DIR/ios/App/App/ 2>/dev/null | head -60
-          echo ""
-          echo "=== project.pbxproj public references ==="
-          grep -c "public" $CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj 2>/dev/null || echo "No public references"
       - name: Set up code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"

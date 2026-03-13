@@ -9,20 +9,6 @@
     <title>TrainLab</title>
   </head>
   <body>
-    <div id="debug-log" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;font-size:12px;font-family:monospace;padding:10px;max-height:50vh;overflow:auto;display:none;"></div>
-    <script>
-      var dbg = document.getElementById('debug-log');
-      function dlog(msg) {
-        dbg.style.display = 'block';
-        dbg.innerHTML += msg + '<br>';
-      }
-      window.onerror = function(m,u,l) { dlog('ERR: ' + m + ' at ' + u + ':' + l); };
-      window.onunhandledrejection = function(e) { dlog('REJECT: ' + (e.reason && e.reason.message || e.reason)); };
-      dlog('HTML loaded at ' + new Date().toISOString());
-      dlog('UA: ' + navigator.userAgent);
-      dlog('Location: ' + window.location.href);
-      dlog('Protocol: ' + window.location.protocol);
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
