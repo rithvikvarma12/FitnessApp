@@ -1,10 +1,10 @@
-# TrainLab – Intelligent Adaptive Training Planner (PWA)
+# TrainLab – Intelligent Adaptive Training Planner
 
-A Progressive Web App built with React + TypeScript + Vite + Dexie (IndexedDB) + Supabase that generates weekly training plans, tracks body weight and nutrition, and adapts to your performance over time.
+A cross-platform fitness app built with React + TypeScript + Vite + Dexie (IndexedDB) + Supabase + Capacitor. Generates weekly training plans, tracks body weight and nutrition, and adapts to your performance over time. Available on web, iOS (TestFlight), and Android.
 
 ## Current Version
 
-v1.0.0 — Auth + Cloud Sync + Adaptive Engine
+v1.1.0 — Native iOS + Android via Capacitor
 
 ## Tech Stack
 
@@ -14,6 +14,9 @@ v1.0.0 — Auth + Cloud Sync + Adaptive Engine
 - **Cloud Backend**: Supabase (Postgres + Auth)
 - **Charts**: Chart.js via react-chartjs-2
 - **PWA**: Service worker, installable, offline capable
+- **Native**: Capacitor (iOS + Android)
+- **CI/CD**: Codemagic (iOS builds + TestFlight), Vercel (web)
+- **Push Notifications**: Firebase Cloud Messaging (FCM V1) via Supabase Edge Functions
 
 ## Features
 
@@ -24,6 +27,19 @@ v1.0.0 — Auth + Cloud Sync + Adaptive Engine
 - Offline queue — failed writes are stored locally and retried automatically when back online
 - Row-level security (RLS) — users can only access their own data
 - Local-first architecture — app works fully offline via Dexie, sync is additive
+
+### Native Mobile
+- Capacitor-powered native iOS and Android builds from single React codebase
+- iOS distributed via TestFlight (Codemagic CI/CD, no Mac required)
+- Android built via Android Studio with custom Gradle config
+- App icon, animated HTML splash screen (bouncing dumbbell + tagline)
+- Haptic feedback on set completion
+- Wake lock during active workouts
+- Safe area handling for iOS notch/Dynamic Island
+- Push notifications via FCM V1 (Firebase + Supabase Edge Function)
+  - Daily 6PM workout reminder
+  - 2-day streak warning
+  - Week complete trigger from app
 
 ### Training Plans
 - Generates 3/4/5 day weekly plans based on goal, equipment, gender, and notes
@@ -114,11 +130,19 @@ User Action
     └─► Supabase (Postgres) — async fire-and-forget sync
               │
               └─► On failure → offlineQueue (Dexie) → retry on reconnect
+
+Native Layer (Capacitor)
+    │
+    ├─► iOS — WKWebView, distributed via TestFlight (Codemagic CI/CD)
+    ├─► Android — WebView, built via Android Studio
+    └─► Push Notifications — FCM V1 → Supabase Edge Function → device
 ```
+
 ## Version History
 
 | Version | Highlights |
 |---|---|
+| v1.1 | Native iOS + Android: Capacitor builds, Codemagic CI/CD for iOS, TestFlight distribution, animated splash, haptics, wake lock, push notifications (FCM V1), safe area handling, app icon |
 | v1.0 | Supabase auth + cloud sync, offline queue, gender-aware plans and nutrition, mid-week plan regeneration, injury resolution flow, TrainLab rebrand |
 | v0.9 | Adaptive engine: structured note chips (7 types), post-session fatigue rating, auto-deload detection, injury/limitation memory with check-ins, adaptive plan summary |
 | v0.8 | Nutrition system (TDEE, macros, daily logging, adherence), SVG muscle map, goal switching improvements |
