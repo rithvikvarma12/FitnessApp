@@ -34,6 +34,10 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
+          # Fix Windows backslashes in Package.swift (generated on Windows dev machine)
+          sed -i '' 's|\\\\|/|g' "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift"
+          echo "=== Package.swift after fix ==="
+          cat "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift"
       - name: Check Xcode build environment
         script: |
           xcodebuild -version
