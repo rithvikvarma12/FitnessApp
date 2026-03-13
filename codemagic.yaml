@@ -10,7 +10,7 @@ workflows:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
         BUNDLE_ID: "com.trainlab.app"
-      node: v20
+      node: v22
       xcode: latest
       cocoapods: default
     triggering:
