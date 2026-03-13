@@ -7,7 +7,7 @@ workflows:
       app_store_connect: Codemagic
     environment:
       vars:
-        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
         BUNDLE_ID: "com.trainlab.app"
       node: v22
@@ -41,10 +41,13 @@ workflows:
         script: |
           cd $CM_BUILD_DIR/ios/App
           agvtool new-version -all $(($(app-store-connect get-latest-build-number "$BUNDLE_ID" || echo "0") + 1))
+      - name: List iOS project structure
+        script: |
+          find ios -maxdepth 4 -name "*.xcodeproj" -o -name "*.xcworkspace" | head -20
       - name: Build IPA
         script: |
           xcode-project build-ipa \
-            --workspace "$CM_BUILD_DIR/$XCODE_WORKSPACE" \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
