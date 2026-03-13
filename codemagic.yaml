@@ -77,11 +77,23 @@ workflows:
       - name: Set entitlements
         script: |
           cd $CM_BUILD_DIR/ios/App
-          # Inject entitlements path into pbxproj for both Debug and Release configs
-          sed -i '' 's|CODE_SIGN_ENTITLEMENTS = "";|CODE_SIGN_ENTITLEMENTS = App/App.entitlements;|g' App.xcodeproj/project.pbxproj
-          sed -i '' 's|CODE_SIGN_ENTITLEMENTS = ""|CODE_SIGN_ENTITLEMENTS = "App/App.entitlements"|g' App.xcodeproj/project.pbxproj
-          echo "=== CODE_SIGN_ENTITLEMENTS after patch ==="
-          grep "CODE_SIGN_ENTITLEMENTS" App.xcodeproj/project.pbxproj
+          PBXPROJ="App.xcodeproj/project.pbxproj"
+
+          # Check if CODE_SIGN_ENTITLEMENTS already exists
+          if grep -q "CODE_SIGN_ENTITLEMENTS" "$PBXPROJ"; then
+            echo "CODE_SIGN_ENTITLEMENTS already exists, updating..."
+            sed -i '' 's|CODE_SIGN_ENTITLEMENTS = ".*";|CODE_SIGN_ENTITLEMENTS = "App/App.entitlements";|g' "$PBXPROJ"
+          else
+            echo "CODE_SIGN_ENTITLEMENTS not found, adding..."
+            # Add after each INFOPLIST_FILE line in build settings
+            sed -i '' 's|INFOPLIST_FILE = "App/Info.plist";|INFOPLIST_FILE = "App/Info.plist";\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = "App/App.entitlements";|g' "$PBXPROJ"
+          fi
+
+          echo "=== Verify entitlements ==="
+          grep "CODE_SIGN_ENTITLEMENTS" "$PBXPROJ" || echo "WARNING: Still not found"
+
+          echo "=== Verify entitlements file exists ==="
+          ls -la $CM_BUILD_DIR/ios/App/App/App.entitlements || echo "ENTITLEMENTS FILE MISSING"
       - name: Set up code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
