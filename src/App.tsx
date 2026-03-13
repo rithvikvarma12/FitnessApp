@@ -126,18 +126,23 @@ export default function App() {
       return;
     }
     setSupabaseProfile(undefined);
+    console.log('[AUTH] session.user.id:', session.user.id);
     supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", session.user.id)
       .maybeSingle()
       .then(async ({ data, error }) => {
+        console.log('[AUTH] profile query result:', data, error);
         if (error) console.error('Supabase profile error:', error);
         if (data) {
           await db.settings.put({ key: "activeUserId", value: data.id });
           await syncFromSupabase(data.id);
           setSupabaseProfile(data);
         } else {
+          // No profile found — log all profiles to diagnose auth_id mismatch
+          const allProfiles = await supabase.from("user_profiles").select("id, auth_id, name").limit(5);
+          console.log('[AUTH] all profiles in table:', allProfiles.data);
           setSupabaseProfile(null);
         }
       });
