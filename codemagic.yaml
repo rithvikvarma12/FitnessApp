@@ -16,7 +16,7 @@ workflows:
         XCODE_SCHEME: "App"
         BUNDLE_ID: "com.trainlab.app"
       node: v22
-      xcode: latest
+      xcode: 16.2
     triggering:
       events:
         - push
@@ -34,6 +34,15 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
+      - name: Check Xcode build environment
+        script: |
+          xcodebuild -version
+          echo ""
+          echo "=== Check index.html has error catcher ==="
+          grep "onerror" $CM_BUILD_DIR/ios/App/App/public/index.html && echo "ERROR CATCHER PRESENT" || echo "ERROR CATCHER MISSING"
+          echo ""
+          echo "=== Full index.html ==="
+          cat $CM_BUILD_DIR/ios/App/App/public/index.html
       - name: Find Capacitor bridge
         script: |
           echo "=== Search for ALL capacitor/bridge related files ==="
