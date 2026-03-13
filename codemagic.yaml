@@ -34,6 +34,19 @@ workflows:
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
+      - name: Verify iOS web assets
+        script: |
+          echo "=== Check dist folder ==="
+          ls -la $CM_BUILD_DIR/dist/ | head -20
+          echo ""
+          echo "=== Check ios/App/App/public ==="
+          ls -la $CM_BUILD_DIR/ios/App/App/public/ 2>/dev/null | head -20 || echo "PUBLIC FOLDER MISSING"
+          echo ""
+          echo "=== Check capacitor.config.json ==="
+          cat $CM_BUILD_DIR/ios/App/App/capacitor.config.json 2>/dev/null || echo "CONFIG JSON MISSING"
+          echo ""
+          echo "=== Check index.html in public ==="
+          head -30 $CM_BUILD_DIR/ios/App/App/public/index.html 2>/dev/null || echo "INDEX.HTML MISSING"
       - name: Set up code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
