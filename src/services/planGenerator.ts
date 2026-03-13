@@ -23,6 +23,7 @@ import {
   applyEquipmentToDayTemplates,
   computePlannedSets,
   remapDayTemplatesForTargetDays,
+  getSlotRules,
   type EquipmentType,
   type GoalMode,
   type MuscleBucket,
@@ -532,8 +533,8 @@ async function generateWeekFromTemplate(
   const userUnit: WeightUnit = userProfile?.unit ?? "kg";
   const userEquipment: EquipmentType = userProfile?.equipment ?? "gym";
   const goalMode: GoalMode = normalizeGoal(userProfile?.goalMode ?? userProfile?.goal);
-  const exerciseCap = exerciseCapForGoal(goalMode);
   const volumePreference = userProfile?.volumePreference;
+  const exerciseCap = Math.max(exerciseCapForGoal(goalMode), getSlotRules(volumePreference).target);
   const homeEquipment = userProfile?.homeEquipment;
   const allMeta = await db.exerciseMeta.toArray();
   const metaByTemplateId = new Map(allMeta.map(m => [m.exerciseTemplateId, m]));

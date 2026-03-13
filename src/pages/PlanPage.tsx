@@ -7,7 +7,7 @@ import type { Unit } from "../services/units";
 import { toDisplay } from "../services/units";
 import { createFirstWeekIfMissing, generateNextWeek, getLatestWeek } from "../services/planGenerator";
 import { shouldSuggestDeload } from "../services/deloadDetector";
-import { classifyMuscleBucket } from "../services/exerciseSelector";
+import { classifyMuscleBucket, getSlotRules, type VolumePreference } from "../services/exerciseSelector";
 import { getActiveInjuries, upsertInjuryFromChip, updateInjuryStatus } from "../services/injuryMemory";
 import type { ActiveInjury } from "../db/types";
 import WeekView from "./WeekView";
@@ -71,9 +71,10 @@ function selectDayTypes(coveredGroups: Set<string>, count: number): DayTypeConfi
 
 function buildWorkoutDay(
   dayType: DayTypeConfig, dateISO: string, allExercises: ExerciseTemplate[],
-  coveredGroups: Set<string>, usedExNames: Set<string>
+  coveredGroups: Set<string>, usedExNames: Set<string>,
+  volumePreference?: VolumePreference
 ): WorkoutDay {
-  const TARGET = 5;
+  const TARGET = getSlotRules(volumePreference).target;
   const uncoveredInDay = dayType.groups.filter((m) => !coveredGroups.has(m));
   const targetMuscles: string[] = uncoveredInDay.length > 0 ? uncoveredInDay : dayType.groups;
   const byMuscle: Record<string, ExerciseTemplate[]> = {};
@@ -881,6 +882,9 @@ export default function PlanPage() {
                     const chosenTypes = selectDayTypes(coveredGroups, slotDates.length);
                     console.log("[AdjustRemaining] chosen:", chosenTypes.map((d) => d.title));
 
+                    // Load profile for volumePreference
+                    const profile = await db.userProfiles.get(selected.userId);
+
                     // Load exercise pool (builtins + custom exercises)
                     const builtinEx = await db.exerciseTemplates.toArray();
                     const customsRaw: CustomExercise[] = await db.customExercises
@@ -903,7 +907,7 @@ export default function PlanPage() {
                     // Build each remaining day
                     const newDays: WorkoutDay[] = slotDates.map((dateISO, i) => {
                       const dayType = chosenTypes[i] ?? chosenTypes[chosenTypes.length - 1];
-                      return buildWorkoutDay(dayType, dateISO, allEx, coveredGroups, usedExNames);
+                      return buildWorkoutDay(dayType, dateISO, allEx, coveredGroups, usedExNames, profile?.volumePreference);
                     });
 
                     const mergedDays = [...completedDays, ...newDays].sort(

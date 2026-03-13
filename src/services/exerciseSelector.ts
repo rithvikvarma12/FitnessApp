@@ -41,29 +41,50 @@ export function normalizeName(name: string): string {
 export function classifyMuscleBucket(name: string): MuscleBucket {
   const n = name.toLowerCase();
 
+  // Legs — explicit named patterns first to avoid interference from later rules
   if (
     n.includes("leg") ||
     n.includes("calf") ||
     n.includes("squat") ||
     n.includes("lunge") ||
     n.includes("glute bridge") ||
-    n.includes("romanian deadlift") ||
-    n.includes("rdl")
+    n.includes("hip thrust") ||
+    n.includes("hip abduction") ||
+    n.includes("step-up") ||
+    n.includes("step up") ||
+    n.includes("deadlift") ||        // covers Romanian, Sumo, Dumbbell, etc.
+    n.includes("rdl") ||
+    n.includes("lateral walk") ||    // before "lateral" matches shoulders
+    n.includes("kettlebell swing") ||
+    n.includes("kettlebell snatch")
   ) return "legs";
 
+  // Triceps — skull crusher / kickback before MUSCLE_KEYWORDS catch "extension"
+  if (n.includes("skull crusher") || n.includes("kickback")) return "triceps";
   if (MUSCLE_KEYWORDS.triceps.some((k) => n.includes(k))) return "triceps";
   if (n.includes("overhead tricep")) return "triceps";
+
+  // Biceps
   if (n.includes("bicep") || MUSCLE_KEYWORDS.biceps.some((k) => n.includes(k))) return "biceps";
-  if (n.includes("dumbbell bicep")) return "biceps";
+
+  // Shoulders — upright row / face pull / pull-apart must come before "row" → back
+  if (n.includes("upright row") || n.includes("face pull") || n.includes("pull-apart")) return "shoulders";
   if (n.includes("pike push-up") || n.includes("pike push up")) return "shoulders";
   if (n.includes("dumbbell shoulder press")) return "shoulders";
   if (MUSCLE_KEYWORDS.shoulders.some((k) => n.includes(k))) return "shoulders";
+
+  // Chest
   if (n.includes("push-up") || n.includes("push up")) return "chest";
   if (n.includes("floor press")) return "chest";
   if (MUSCLE_KEYWORDS.chest.some((k) => n.includes(k))) return "chest";
+
+  // Back — pull-ups, chin-ups, pullover, then keyword matches
+  if (
+    n.includes("pull-up") || n.includes("pull up") || n.includes("pullup") ||
+    n.includes("chin-up") || n.includes("chin up") || n.includes("chinup") ||
+    n.includes("pullover")
+  ) return "back";
   if (MUSCLE_KEYWORDS.back.some((k) => n.includes(k))) return "back";
-  if ((n.includes("extension") || n.includes("curl")) && n.includes("leg")) return "legs";
-  if (n.includes("press") && n.includes("leg")) return "legs";
   if (n.includes("row")) return "back";
 
   return "other";
