@@ -343,16 +343,16 @@
   justify-items: center;
 }
 
-/* ── PR Celebration Overlay ───────────────────────────────────────────── */
+/* ── PR Celebration Overlay — Bottom Sheet ────────────────────────────── */
 
 .pr-overlay {
   position: fixed;
   inset: 0;
   background: var(--overlay-bg);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  padding: 16px;
+  padding: 0;
   z-index: 2000;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -377,24 +377,47 @@
 
 .pr-card {
   position: relative;
-  background: rgba(13, 18, 32, 0.96);
+  background: rgba(13, 18, 32, 0.97);
   border: 1px solid rgba(234, 179, 8, 0.3);
-  border-radius: 20px;
-  padding: 28px 24px 20px;
-  width: min(420px, 100%);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  padding: 0 24px calc(env(safe-area-inset-bottom, 16px) + 24px);
+  width: 100%;
   text-align: center;
   display: grid;
   gap: 16px;
-  animation: pr-card-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation: pr-slide-up 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   z-index: 1;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
-.pr-card--exit {
-  animation: pr-card-out 0.3s ease forwards;
+/* Drag handle */
+.pr-card::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(234, 179, 8, 0.4);
+  margin: 14px auto 4px;
 }
 
+.pr-card--exit {
+  animation: pr-slide-down 0.3s ease forwards;
+}
+
+@keyframes pr-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes pr-slide-down {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+
+/* Legacy — kept in case referenced elsewhere */
 @keyframes pr-card-in {
   from { transform: scale(0.75); opacity: 0; }
   to   { transform: scale(1);    opacity: 1; }
