@@ -46,7 +46,7 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!msg.includes("cancelled") && !msg.includes("cancel")) {
-        setErr("Purchase failed. Please try again.");
+        setErr("Unable to connect to App Store. Please try again later.");
       }
     } finally {
       setBusy(false);
@@ -148,6 +148,16 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
                 {err}
               </div>
             )}
+            <button
+              onClick={onClose}
+              style={{
+                background: "none", border: "none", padding: "4px 0",
+                fontSize: 13, color: "var(--text-muted)", cursor: "pointer",
+                textDecoration: "underline", textAlign: "center",
+              }}
+            >
+              Not now
+            </button>
           </div>
         ) : (
           <div className="card" style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>

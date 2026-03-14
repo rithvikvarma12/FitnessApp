@@ -4,6 +4,7 @@ interface WelcomePageProps {
   profiles: UserProfile[];
   onSelectProfile: (id: string) => void;
   onCreateNew: () => void;
+  onSignOut?: () => void;
 }
 
 function DumbbellIcon() {
@@ -23,7 +24,7 @@ const GOAL_LABEL: Record<string, string> = {
   cut: "Cut", maintain: "Maintain", bulk: "Bulk"
 };
 
-export default function WelcomePage({ profiles, onSelectProfile, onCreateNew }: WelcomePageProps) {
+export default function WelcomePage({ profiles, onSelectProfile, onCreateNew, onSignOut }: WelcomePageProps) {
   const isFirstTime = profiles.length === 0;
 
   return (
@@ -81,6 +82,18 @@ export default function WelcomePage({ profiles, onSelectProfile, onCreateNew }: 
           >
             Get Started
           </button>
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              style={{
+                background: "none", border: "none", padding: "4px 0",
+                fontSize: 13, color: "var(--text-muted)", cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              Sign in with a different account
+            </button>
+          )}
         </div>
       ) : (
         /* ── Profile selection ── */
@@ -141,6 +154,18 @@ export default function WelcomePage({ profiles, onSelectProfile, onCreateNew }: 
           >
             + Create New Profile
           </button>
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              style={{
+                background: "none", border: "none", padding: "4px 0",
+                fontSize: 13, color: "var(--text-muted)", cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              Sign in with a different account
+            </button>
+          )}
         </div>
       )}
     </div>

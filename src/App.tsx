@@ -19,6 +19,7 @@ import { syncFromSupabase } from "./lib/syncFromSupabase";
 import { initPushNotifications } from "./lib/notifications";
 import { ProProvider } from "./lib/ProContext";
 import { initPurchases, loginPurchases, logoutPurchases } from "./lib/purchases";
+import { signOut } from "./lib/auth";
 import type { Session } from "@supabase/supabase-js";
 
 type Tab = "plan" | "weight" | "progress" | "nutrition" | "profile";
@@ -250,6 +251,10 @@ export default function App() {
             if (profile) await db.settings.put({ key: "unit", value: profile.unit });
           }}
           onCreateNew={() => setShowSetup(true)}
+          onSignOut={async () => {
+            await signOut();
+            await db.settings.delete("activeUserId");
+          }}
         />
       </>
     );

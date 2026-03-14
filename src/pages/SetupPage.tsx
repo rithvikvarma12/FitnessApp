@@ -99,6 +99,7 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
   const [form, setForm] = useState<FormState>(presetDefaults("generic"));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [volumeMsg, setVolumeMsg] = useState<string | null>(null);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => {
@@ -187,7 +188,15 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
         createdAtISO: new Date().toISOString()
       };
 
-      await db.userProfiles.add(profile);
+      try {
+        await db.userProfiles.add(profile);
+      } catch (dexieErr: unknown) {
+        const msg = dexieErr instanceof Error ? dexieErr.message : String(dexieErr);
+        if (msg.toLowerCase().includes("constraint") || msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("duplicate")) {
+          throw new Error("Each account supports one profile. Go to Profile settings to update your existing profile.");
+        }
+        throw dexieErr;
+      }
 
       // Upsert full profile to Supabase now that setup is complete
       try {
@@ -214,8 +223,19 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
           activity_multiplier: profile.activityMultiplier ?? null,
           created_at: profile.createdAtISO,
         });
-        if (profileUpsertErr) console.error("Supabase profile upsert error:", profileUpsertErr);
-      } catch { /* ignore */ }
+        if (profileUpsertErr) {
+          if (profileUpsertErr.code === "23505") {
+            // unique constraint on auth_id — this account already has a profile
+            await db.userProfiles.delete(profile.id);
+            throw new Error("Each account supports one profile. Go to Profile settings to update your existing profile.");
+          }
+          console.error("Supabase profile upsert error:", profileUpsertErr);
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "";
+        if (msg.includes("one profile")) throw e;
+        /* ignore other Supabase errors */
+      }
 
       // Auto-create nutrition settings from body stats
       const ns = generateNutritionSettings(profile, currentWeightKg);
@@ -455,27 +475,43 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
       <div style={{ marginTop: 10 }}>
         {fl("Volume preference")}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {(["light", "moderate", "high"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setField("volumePreference", v)}
-              style={{
-                flex: "1 1 auto",
-                padding: "9px 12px",
-                fontSize: 12,
-                fontWeight: form.volumePreference === v ? 700 : 500,
-                borderRadius: "var(--radius-md)",
-                border: `1px solid ${form.volumePreference === v ? "var(--accent-blue)" : "var(--border)"}`,
-                background: form.volumePreference === v ? "rgba(59,130,246,0.12)" : "var(--surface)",
-                color: form.volumePreference === v ? "var(--accent-blue)" : "var(--text-secondary)",
-                cursor: "pointer",
-              }}
-            >
-              {v === "light" ? "Light (4 ex/day)" : v === "moderate" ? "Moderate (6 ex/day)" : "High (7 ex/day)"}
-            </button>
-          ))}
+          {(["light", "moderate", "high"] as const).map((v) => {
+            const isLocked = v === "high";
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  if (isLocked) {
+                    setVolumeMsg("High volume is a Pro feature — available after your 7-day free trial.");
+                    return;
+                  }
+                  setVolumeMsg(null);
+                  setField("volumePreference", v);
+                }}
+                style={{
+                  flex: "1 1 auto",
+                  padding: "9px 12px",
+                  fontSize: 12,
+                  fontWeight: form.volumePreference === v ? 700 : 500,
+                  borderRadius: "var(--radius-md)",
+                  border: `1px solid ${form.volumePreference === v ? "var(--accent-blue)" : "var(--border)"}`,
+                  background: form.volumePreference === v ? "rgba(59,130,246,0.12)" : "var(--surface)",
+                  color: isLocked ? "var(--text-muted)" : form.volumePreference === v ? "var(--accent-blue)" : "var(--text-secondary)",
+                  cursor: "pointer",
+                  opacity: isLocked ? 0.7 : 1,
+                }}
+              >
+                {v === "light" ? "Light (4 ex/day)" : v === "moderate" ? "Moderate (6 ex/day)" : "🔒 High (7 ex/day)"}
+              </button>
+            );
+          })}
         </div>
+        {volumeMsg && (
+          <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-muted)", background: "rgba(59,130,246,0.06)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "6px 10px" }}>
+            {volumeMsg}
+          </div>
+        )}
       </div>
 
       {/* Home equipment checklist */}

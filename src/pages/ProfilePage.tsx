@@ -764,6 +764,9 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
                     <span>Carbs <strong style={{ color: "var(--text-primary)" }}>{settings.carbsGrams}g</strong></span>
                     <span>Fat <strong style={{ color: "var(--text-primary)" }}>{settings.fatGrams}g</strong></span>
                   </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+                    Protein: {(settings.proteinGrams / wKg).toFixed(1)}g × {wKg.toFixed(1)}kg = {settings.proteinGrams}g ({genderInput}, {form.goalMode})
+                  </div>
                 </div>
               );
             })()}

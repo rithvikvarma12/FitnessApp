@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn, signUp } from "../lib/auth";
 import { signInWithApple, signInWithGoogle } from "../lib/socialAuth";
+import { supabase } from "../lib/supabase";
 
 type Mode = "signin" | "signup";
 
@@ -26,6 +27,28 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  // Poll for session after signup email verification
+  useEffect(() => {
+    if (!info) return;
+    const interval = setInterval(async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        clearInterval(interval);
+        onAuth?.();
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [info, onAuth]);
+
+  const handleCheckVerification = async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      onAuth?.();
+    } else {
+      setErr("Email not yet verified. Please check your inbox and click the confirmation link.");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,15 +186,29 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
           )}
 
           {info && (
-            <div style={{
-              fontSize: 12, color: "#10b981",
-              background: "rgba(16,185,129,0.08)",
-              border: "1px solid rgba(16,185,129,0.2)",
-              borderRadius: "var(--radius-md)",
-              padding: "8px 12px",
-            }}>
-              {info}
-            </div>
+            <>
+              <div style={{
+                fontSize: 12, color: "#10b981",
+                background: "rgba(16,185,129,0.08)",
+                border: "1px solid rgba(16,185,129,0.2)",
+                borderRadius: "var(--radius-md)",
+                padding: "8px 12px",
+              }}>
+                {info}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleCheckVerification()}
+                style={{
+                  width: "100%", padding: "11px", fontSize: 13, fontWeight: 600,
+                  background: "rgba(16,185,129,0.1)", color: "#10b981",
+                  border: "1px solid rgba(16,185,129,0.3)",
+                  borderRadius: "var(--radius-md)", cursor: "pointer",
+                }}
+              >
+                I've verified my email
+              </button>
+            </>
           )}
 
           <button
