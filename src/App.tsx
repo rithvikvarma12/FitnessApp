@@ -13,9 +13,12 @@ import ProfilePage from "./pages/ProfilePage";
 import ProgressPage from "./pages/ProgressPage";
 import NutritionPage from "./pages/NutritionPage";
 import AuthPage from "./pages/AuthPage";
+import PaywallPage from "./pages/PaywallPage";
 import { supabase } from "./lib/supabase";
 import { syncFromSupabase } from "./lib/syncFromSupabase";
 import { initPushNotifications } from "./lib/notifications";
+import { ProProvider } from "./lib/ProContext";
+import { initPurchases, loginPurchases, logoutPurchases } from "./lib/purchases";
 import type { Session } from "@supabase/supabase-js";
 
 type Tab = "plan" | "weight" | "progress" | "nutrition" | "profile";
@@ -72,6 +75,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("plan");
   const [ready, setReady] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [supabaseProfile, setSupabaseProfile] = useState<Record<string, unknown> | null | undefined>(undefined);
 
@@ -106,6 +110,7 @@ export default function App() {
       // await createFirstWeekIfMissing();
       setReady(true);
       await initPushNotifications();
+      await initPurchases();
     })();
 
     supabase.auth.getSession().then(({ data }) => {
@@ -123,6 +128,7 @@ export default function App() {
     if (session === undefined) return;
     if (!session) {
       setSupabaseProfile(null);
+      void logoutPurchases();
       return;
     }
     setSupabaseProfile(undefined);
@@ -136,6 +142,7 @@ export default function App() {
         if (data) {
           await db.settings.put({ key: "activeUserId", value: data.id });
           await syncFromSupabase(data.id);
+          await loginPurchases(data.id as string);
           setSupabaseProfile(data);
         } else {
           // No Supabase profile found — check if there's a local profile we can recover
@@ -249,7 +256,9 @@ export default function App() {
   }
 
   return (
-    <>
+    <ProProvider onOpenPaywall={() => setShowPaywall(true)}>
+      {showPaywall && <PaywallPage onClose={() => setShowPaywall(false)} />}
+      <>
       {/* Ambient depth blobs */}
       <div className="ambient-bg">
         <div className="ambient-blob ambient-blob--blue" />
@@ -348,6 +357,7 @@ export default function App() {
           Profile
         </button>
       </nav>
-    </>
+      </>
+    </ProProvider>
   );
 }

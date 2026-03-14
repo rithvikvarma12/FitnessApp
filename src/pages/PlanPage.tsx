@@ -18,6 +18,7 @@ import { weeklyTrendFromWindow } from "../services/stats";
 import { deriveAutoCardio } from "../services/cardio";
 import { supabase } from "../lib/supabase";
 import { queueOperation } from "../lib/offlineQueue";
+import { useProContext } from "../lib/ProContext";
 
 
 // ─── Adjust Remaining Days helpers ────────────────────────────────────────────
@@ -159,6 +160,7 @@ function syncWeekPlanToSupabase(week: WeekPlan) {
   } catch { /* ignore */ }
 }
 export default function PlanPage() {
+  const { isPro, openPaywall } = useProContext();
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
 
   const weeks = useLiveQuery(
@@ -219,6 +221,11 @@ export default function PlanPage() {
     cutoff.setDate(cutoff.getDate() - 14);
     return activeInjuries.filter((inj) => new Date(inj.lastCheckISO) < cutoff);
   }, [activeInjuries]);
+
+  const totalCompletedWorkouts = useMemo(() => {
+    if (!weeks) return 0;
+    return weeks.reduce((sum, w) => sum + w.days.filter((d) => d.isComplete).length, 0);
+  }, [weeks]);
 
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -797,15 +804,34 @@ export default function PlanPage() {
           <button
             className="secondary"
             disabled={busy || !selected || !!selected?.isLocked || completion.allComplete}
-            onClick={() => { setAdjustRemainingMode(true); setAdjustDayCount(null); setAdjustMsg(null); }}
+            onClick={() => {
+              if (!isPro) { openPaywall(); return; }
+              setAdjustRemainingMode(true); setAdjustDayCount(null); setAdjustMsg(null);
+            }}
           >
-            Adjust Remaining Days
+            Adjust Remaining Days {!isPro && <span style={{ fontSize: 9, opacity: 0.7 }}>🔒</span>}
           </button>
         </div>
 
         {!completion.allComplete && selected && !selected.isLocked && (
           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
             Finish all days or use "End Week Early" to generate next week.
+          </div>
+        )}
+
+        {!isPro && totalCompletedWorkouts >= 7 && (
+          <div
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "8px 12px", borderRadius: "var(--radius-md)",
+              border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.07)",
+              fontSize: 12, color: "var(--text-secondary)", gap: 8,
+            }}
+          >
+            <span>Enjoying TrainLab? Unlock Pro for advanced planning tools.</span>
+            <button style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }} onClick={openPaywall}>
+              Upgrade
+            </button>
           </div>
         )}
 

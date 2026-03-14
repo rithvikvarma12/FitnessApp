@@ -1,6 +1,9 @@
 import { useState } from "react";
 import type { NoteChip } from "../db/types";
 import type { ActiveInjury } from "../db/types";
+import { useProContext } from "../lib/ProContext";
+
+const FREE_CHIPS = new Set<string>(["deload", "fatigued"]);
 
 interface NoteChipsProps {
   chips: NoteChip[];
@@ -100,6 +103,7 @@ function NumberSelector({ value, min, max, color, onChange, disabled }: {
 }
 
 export default function NoteChips({ chips, onChange, disabled, injuries, onUpdateInjuryStatus }: NoteChipsProps) {
+  const { isPro, openPaywall } = useProContext();
   const [openFollowUp, setOpenFollowUp] = useState<ChipType | null>(null);
   // pendingChip holds unsaved state for chips with follow-ups not yet complete
   const [pendingChip, setPendingChip] = useState<NoteChip | null>(null);
@@ -136,6 +140,7 @@ export default function NoteChips({ chips, onChange, disabled, injuries, onUpdat
   }
   function handleChipClick(cfg: typeof CHIP_CONFIG[number]) {
     if (disabled) return;
+    if (!isPro && !FREE_CHIPS.has(cfg.type)) { openPaywall(); return; }
     if (isActive(cfg.type)) { removeChip(cfg.type); return; }
     if (isPending(cfg.type)) { discardPending(); return; }
     if (pendingChip) setPendingChip(null);
@@ -190,6 +195,9 @@ export default function NoteChips({ chips, onChange, disabled, injuries, onUpdat
               }}
             >
               {cfg.label}
+              {!isPro && !FREE_CHIPS.has(cfg.type) && (
+                <span style={{ marginLeft: 4, opacity: 0.6, fontSize: 9 }}>🔒</span>
+              )}
               {pending && cfg.hasFollowUp && (
                 <span style={{ marginLeft: 4, opacity: 0.7, fontSize: 10 }}>{"…"}</span>
               )}

@@ -16,6 +16,7 @@ import { db, getActiveUserId } from "../db/db";
 import { supabase } from "../lib/supabase";
 import { queueOperation } from "../lib/offlineQueue";
 import type { DailyNutritionLog } from "../db/types";
+import { useProContext } from "../lib/ProContext";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -99,6 +100,7 @@ interface NutritionPageProps {
 }
 
 export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
+  const { isPro, openPaywall } = useProContext();
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const theme = useLiveQuery(async () => {
     const s = await db.settings.get("theme");
@@ -418,9 +420,18 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
 
         <input placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ fontSize: 12 }} />
 
-        <button disabled={logBusy} onClick={() => void handleLog()} style={{ alignSelf: "flex-start" }}>
-          {logBusy ? "Saving…" : log ? "Update" : "Log"}
-        </button>
+        {!isPro ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={openPaywall} style={{ alignSelf: "flex-start" }}>
+              Log (Pro) 🔒
+            </button>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Upgrade to log nutrition</span>
+          </div>
+        ) : (
+          <button disabled={logBusy} onClick={() => void handleLog()} style={{ alignSelf: "flex-start" }}>
+            {logBusy ? "Saving…" : log ? "Update" : "Log"}
+          </button>
+        )}
       </div>
 
       {/* Weekly summary */}

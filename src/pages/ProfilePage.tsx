@@ -8,6 +8,8 @@ import { updateInjuryStatus } from "../services/injuryMemory";
 import { generateNutritionSettings, defaultActivityMultiplier, recalculateNutritionIfAuto } from "../services/nutritionCalculator";
 import { supabase } from "../lib/supabase";
 import { queueOperation } from "../lib/offlineQueue";
+import { useProContext } from "../lib/ProContext";
+import { FREE_FEATURES } from "../lib/featureGate";
 
 function syncNutritionSettingsToSupabase(ns: NutritionSettings) {
   try {
@@ -173,6 +175,7 @@ function InjuryCard({ inj }: { inj: ActiveInjury }) {
 }
 
 export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
+  const { isPro, openPaywall } = useProContext();
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const unit = useLiveQuery(async () => {
     const s = await db.settings.get("unit");
@@ -412,6 +415,10 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
   const onAddCustomExercise = async () => {
     if (!activeUserId) return;
     setCustomError(null);
+    if (!isPro && (customExercises ?? []).length >= FREE_FEATURES.maxCustomExercises) {
+      openPaywall();
+      return;
+    }
     const trimmed = customForm.name.trim();
     if (!trimmed) { setCustomError("Name is required."); return; }
     const nameLower = trimmed.toLowerCase();
@@ -527,26 +534,33 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
       <div style={{ marginTop: 10 }}>
         {fieldLabel("Volume preference")}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {(["light", "moderate", "high"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setForm((prev) => (prev ? { ...prev, volumePreference: v } : prev))}
-              style={{
-                flex: "1 1 auto",
-                padding: "9px 12px",
-                fontSize: 12,
-                fontWeight: form.volumePreference === v ? 700 : 500,
-                borderRadius: "var(--radius-md)",
-                border: `1px solid ${form.volumePreference === v ? "var(--accent-blue)" : "var(--border)"}`,
-                background: form.volumePreference === v ? "rgba(59,130,246,0.12)" : "var(--surface)",
-                color: form.volumePreference === v ? "var(--accent-blue)" : "var(--text-secondary)",
-                cursor: "pointer",
-              }}
-            >
-              {v === "light" ? "Light (4 ex/day)" : v === "moderate" ? "Moderate (6 ex/day)" : "High (7 ex/day)"}
-            </button>
-          ))}
+          {(["light", "moderate", "high"] as const).map((v) => {
+            const isProGated = v === "high" && !isPro;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  if (isProGated) { openPaywall(); return; }
+                  setForm((prev) => (prev ? { ...prev, volumePreference: v } : prev));
+                }}
+                style={{
+                  flex: "1 1 auto",
+                  padding: "9px 12px",
+                  fontSize: 12,
+                  fontWeight: form.volumePreference === v ? 700 : 500,
+                  borderRadius: "var(--radius-md)",
+                  border: `1px solid ${form.volumePreference === v ? "var(--accent-blue)" : "var(--border)"}`,
+                  background: form.volumePreference === v ? "rgba(59,130,246,0.12)" : "var(--surface)",
+                  color: form.volumePreference === v ? "var(--accent-blue)" : "var(--text-secondary)",
+                  cursor: "pointer",
+                }}
+              >
+                {v === "light" ? "Light (4 ex/day)" : v === "moderate" ? "Moderate (6 ex/day)" : "High (7 ex/day)"}
+                {isProGated && <span style={{ marginLeft: 4, fontSize: 9 }}>🔒</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -857,6 +871,29 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
             {nutritionMsg && (
               <div style={{ marginTop: 6, fontSize: 12, color: nutritionMsg.includes("Enter") ? "#f97316" : "#10b981" }}>{nutritionMsg}</div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Pro Status */}
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Subscription</div>
+        {isPro ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.07)" }}>
+            <span style={{ fontSize: 18 }}>🏆</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#10b981" }}>TrainLab Pro</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>All features unlocked</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-glass)", background: "var(--bg-subtle)" }}>
+            <span style={{ fontSize: 18 }}>🔒</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Free Plan</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Upgrade for full access</div>
+            </div>
+            <button style={{ padding: "6px 12px", fontSize: 12 }} onClick={openPaywall}>Upgrade</button>
           </div>
         )}
       </div>
