@@ -34,6 +34,8 @@ export async function signInWithApple() {
   const rawNonce = generateNonce();
   const hashedNonce = await sha256(rawNonce);
 
+  console.log('[APPLE AUTH] Starting login with hashed nonce:', hashedNonce);
+
   const result = await SocialLogin.login({
     provider: 'apple',
     options: {
@@ -42,12 +44,24 @@ export async function signInWithApple() {
     },
   });
 
-  const token = (result as any)?.result?.identityToken;
-  if (!token) throw new Error('No identity token received from Apple');
+  console.log('[APPLE AUTH] Full result:', JSON.stringify(result, null, 2));
+  console.log('[APPLE AUTH] result.result:', JSON.stringify((result as any)?.result, null, 2));
+
+  // The token might be at a different path depending on plugin version
+  const idToken = (result as any)?.result?.identityToken
+    || (result as any)?.result?.idToken
+    || (result as any)?.result?.credential?.identityToken
+    || (result as any)?.result?.response?.identityToken;
+
+  console.log('[APPLE AUTH] Found token:', idToken ? 'yes (' + (idToken as string).substring(0, 20) + '...)' : 'NO');
+
+  if (!idToken) {
+    throw new Error('No identity token received from Apple. Result keys: ' + Object.keys((result as any)?.result || {}).join(', '));
+  }
 
   const { data, error } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
-    token,
+    token: idToken,
     nonce: rawNonce,
   });
 
