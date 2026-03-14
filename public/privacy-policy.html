@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — TrainLab</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #060A26;
+      color: #e8ecf4;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 0 16px 64px;
+    }
+
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 0;
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #3b82f6 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8b9bb5;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .effective {
+      font-size: 13px;
+      color: #8b9bb5;
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin: 40px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    p { margin-bottom: 14px; color: #c2cde0; }
+
+    ul {
+      margin: 0 0 14px 20px;
+      color: #c2cde0;
+    }
+
+    ul li { margin-bottom: 6px; }
+
+    .highlight {
+      background: rgba(59,130,246,0.1);
+      border-left: 3px solid #3b82f6;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 14px;
+      color: #c2cde0;
+    }
+
+    .contact-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-top: 12px;
+    }
+
+    .contact-card p { margin: 0; }
+
+    footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+      color: #4e5c76;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 24px;
+      align-items: center;
+    }
+
+    footer a { color: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">TrainLab</div>
+    <div class="badge">Legal</div>
+
+    <h1>Privacy Policy</h1>
+    <p class="effective">Effective Date: March 15, 2026 &nbsp;·&nbsp; Developer: Rithvik Varma Datla</p>
+
+    <p>This Privacy Policy describes how TrainLab ("we", "us", or "our") collects, uses, and protects your information when you use the TrainLab mobile application and any associated services. By using TrainLab, you agree to the practices described here.</p>
+
+    <h2>1. Information We Collect</h2>
+    <p>We collect the following categories of data when you use TrainLab:</p>
+    <ul>
+      <li><strong>Account information:</strong> your name and email address (provided when you sign up or sign in with Apple or Google)</li>
+      <li><strong>Workout data:</strong> exercise logs, sets, reps, weights, planned workouts, and weekly training history</li>
+      <li><strong>Body weight data:</strong> weight entries you log in the app</li>
+      <li><strong>Nutrition data:</strong> food entries, calorie and macro logs (if you use the nutrition feature)</li>
+      <li><strong>Profile settings:</strong> your fitness goal, training preferences, equipment availability, and unit preference</li>
+      <li><strong>Device tokens:</strong> push notification tokens to deliver workout reminders (if you grant notification permission)</li>
+    </ul>
+
+    <div class="highlight">
+      We do <strong>not</strong> collect location data, contacts, photos, or any data unrelated to your fitness activity.
+    </div>
+
+    <h2>2. How We Use Your Data</h2>
+    <p>Your data is used exclusively to provide and improve the TrainLab service:</p>
+    <ul>
+      <li>Generating and adapting your weekly training plans</li>
+      <li>Displaying your workout history, progress analytics, and personal records</li>
+      <li>Syncing your data across devices</li>
+      <li>Sending workout reminders via push notification (only if you opt in)</li>
+      <li>Managing your Pro subscription status</li>
+    </ul>
+
+    <div class="highlight">
+      We do <strong>not</strong> sell your data to third parties. We do <strong>not</strong> use your data for advertising or profiling purposes.
+    </div>
+
+    <h2>3. How We Store Your Data</h2>
+    <p>Your data is stored on <strong>Supabase</strong> (hosted on AWS infrastructure). Supabase uses row-level security (RLS) policies to ensure that only you can access your own data. All data is encrypted in transit via HTTPS/TLS. Data at rest is encrypted by the underlying AWS infrastructure.</p>
+    <p>A local copy of your workout data may also be stored on your device using IndexedDB for offline access.</p>
+
+    <h2>4. Third-Party Services</h2>
+    <p>TrainLab integrates with the following third-party services, each with their own privacy practices:</p>
+    <ul>
+      <li><strong>Supabase</strong> — authentication and database storage. <a href="https://supabase.com/privacy" target="_blank" rel="noreferrer">Supabase Privacy Policy</a></li>
+      <li><strong>Firebase (Google)</strong> — push notification delivery. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noreferrer">Firebase Privacy Policy</a></li>
+      <li><strong>RevenueCat</strong> — subscription and entitlement management. <a href="https://www.revenuecat.com/privacy" target="_blank" rel="noreferrer">RevenueCat Privacy Policy</a></li>
+      <li><strong>Apple</strong> — Sign in with Apple and in-app purchase processing. <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noreferrer">Apple Privacy Policy</a></li>
+      <li><strong>Google</strong> — Sign in with Google and Play Store payment processing. <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google Privacy Policy</a></li>
+    </ul>
+
+    <h2>5. Analytics and Crash Reporting</h2>
+    <p>TrainLab does not currently use third-party analytics or crash reporting services that collect personally identifiable information. If this changes, this policy will be updated accordingly and users will be notified.</p>
+
+    <h2>6. Data Retention</h2>
+    <p>We retain your data for as long as your account is active. If you delete your account, we will permanently delete all of your personal data and workout history from our servers within 30 days of the request.</p>
+
+    <h2>7. Your Rights and Account Deletion</h2>
+    <p>You have the right to:</p>
+    <ul>
+      <li>Access the personal data we hold about you</li>
+      <li>Request correction of inaccurate data</li>
+      <li>Request deletion of your account and all associated data</li>
+      <li>Request a copy of your data (data portability)</li>
+      <li>Withdraw consent for push notifications at any time in your device settings</li>
+    </ul>
+    <p>To exercise any of these rights, please contact us at <a href="mailto:rithvik_vd@outlook.com">rithvik_vd@outlook.com</a>. We will respond within 30 days.</p>
+
+    <h2>8. GDPR (European Users)</h2>
+    <p>If you are located in the European Economic Area (EEA), you have additional rights under the General Data Protection Regulation (GDPR), including the right to data portability and the right to lodge a complaint with your local data protection authority.</p>
+    <p>Our legal basis for processing your data is performance of a contract (providing the TrainLab service you signed up for). We do not process data on the basis of legitimate interests for advertising or profiling.</p>
+    <p>To request a data export or deletion under GDPR, contact us at <a href="mailto:rithvik_vd@outlook.com">rithvik_vd@outlook.com</a>.</p>
+
+    <h2>9. Children's Privacy</h2>
+    <p>TrainLab is not directed at children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that a child under 13 has provided us with personal information, we will delete it promptly. If you believe a child has provided us with their data, please contact us immediately.</p>
+
+    <h2>10. Security</h2>
+    <p>We take reasonable technical and organizational measures to protect your data, including HTTPS encryption for all data in transit, row-level security on our database, and access controls limiting who can access production data. However, no method of electronic storage or transmission is 100% secure.</p>
+
+    <h2>11. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. When we do, we will update the Effective Date at the top of this page. For material changes, we will notify users within the app. We encourage you to review this page periodically.</p>
+
+    <h2>12. Contact Us</h2>
+    <p>If you have any questions or concerns about this Privacy Policy, please contact:</p>
+    <div class="contact-card">
+      <p><strong>Rithvik Varma Datla</strong><br />
+      Developer, TrainLab<br />
+      <a href="mailto:rithvik_vd@outlook.com">rithvik_vd@outlook.com</a></p>
+    </div>
+
+    <footer>
+      <span>© 2026 TrainLab · Rithvik Varma Datla</span>
+      <a href="terms-of-service.html">Terms of Service</a>
+      <a href="mailto:rithvik_vd@outlook.com">Contact</a>
+    </footer>
+  </div>
+</body>
+</html>
