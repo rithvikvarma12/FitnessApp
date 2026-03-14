@@ -53,7 +53,8 @@ workflows:
                   .package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics"),
                   .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen"),
                   .package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications"),
-                  .package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake")
+                  .package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake"),
+                  .package(name: "CapgoCapacitorSocialLogin", path: "../../../node_modules/@capgo/capacitor-social-login")
               ],
               targets: [
                   .target(
@@ -64,7 +65,8 @@ workflows:
                           .product(name: "CapacitorHaptics", package: "CapacitorHaptics"),
                           .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                           .product(name: "CapacitorPushNotifications", package: "CapacitorPushNotifications"),
-                          .product(name: "CapacitorCommunityKeepAwake", package: "CapacitorCommunityKeepAwake")
+                          .product(name: "CapacitorCommunityKeepAwake", package: "CapacitorCommunityKeepAwake"),
+                          .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin")
                       ]
                   )
               ]
@@ -72,6 +74,53 @@ workflows:
           PKGEOF
           echo "=== Package.swift after fix ==="
           cat "$CM_BUILD_DIR/ios/App/CapApp-SPM/Package.swift"
+      - name: Set entitlements
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          PBXPROJ="App.xcodeproj/project.pbxproj"
+
+          # Use Python to reliably add CODE_SIGN_ENTITLEMENTS to all build configs
+          python3 << 'EOF'
+          import re
+
+          with open("App.xcodeproj/project.pbxproj", "r") as f:
+              content = f.read()
+
+          # Add CODE_SIGN_ENTITLEMENTS after every INFOPLIST_FILE occurrence in buildSettings
+          if "CODE_SIGN_ENTITLEMENTS" not in content:
+              content = re.sub(
+                  r'(INFOPLIST_FILE = [^;]+;)',
+                  r'\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = "App/App.entitlements";',
+                  content
+              )
+              with open("App.xcodeproj/project.pbxproj", "w") as f:
+                  f.write(content)
+              print("Added CODE_SIGN_ENTITLEMENTS to pbxproj")
+          else:
+              print("CODE_SIGN_ENTITLEMENTS already present")
+          EOF
+
+          echo "=== Verify ==="
+          grep "CODE_SIGN_ENTITLEMENTS" "$PBXPROJ" || echo "STILL NOT FOUND"
+
+          echo "=== Verify entitlements file exists ==="
+          ls -la $CM_BUILD_DIR/ios/App/App/App.entitlements || echo "ENTITLEMENTS FILE MISSING"
+      - name: Verify entitlements setup
+        script: |
+          echo "=== Entitlements file contents ==="
+          cat $CM_BUILD_DIR/ios/App/App/App.entitlements
+          echo ""
+          echo "=== pbxproj entitlements references ==="
+          grep -i "entitlements" $CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj
+          echo ""
+          echo "=== Provisioning profile entitlements ==="
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_PATH=$(ls "$PROFILES_DIR"/*.mobileprovision 2>/dev/null | head -1)
+          if [ -n "$PROFILE_PATH" ]; then
+            security cms -D -i "$PROFILE_PATH" | grep -A 20 "Entitlements"
+          else
+            echo "No provisioning profile found"
+          fi
       - name: Set up code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
