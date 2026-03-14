@@ -4,6 +4,7 @@ import type { PRComparison } from "../services/progressTracker";
 import { formatVolumeDisplay } from "../services/progressTracker";
 import type { Unit } from "../services/units";
 import { toDisplay } from "../services/units";
+import Portal from "./Portal";
 
 type Props = {
   day: WorkoutDay;
@@ -60,6 +61,7 @@ export default function SessionSummary({ day, unit, prs, onConfirm, onCancel }: 
   const volumeStr = formatVolumeDisplay(totalVolumeKg, unit);
 
   return (
+    <Portal>
     <div className="modalBackdrop" onClick={onCancel}>
       <div className="modalCard session-summary-card" onClick={(e) => e.stopPropagation()}>
         <div className="session-summary-header">
@@ -144,5 +146,6 @@ export default function SessionSummary({ day, unit, prs, onConfirm, onCancel }: 
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

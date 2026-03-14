@@ -3,6 +3,7 @@ import { classifyCompound } from "../db/db";
 import type { ExerciseMeta } from "../db/types";
 import MuscleMap from "./MuscleMap";
 import { getMuscleTargets } from "../services/muscleMapping";
+import Portal from "./Portal";
 
 interface ExerciseInfoModalProps {
   exerciseName: string | null;
@@ -38,6 +39,7 @@ export default function ExerciseInfoModal({
   const muscleTargets = getMuscleTargets(exerciseName, meta?.primaryMuscles[0]);
 
   return (
+    <Portal>
     <div
       className="modalBackdrop"
       role="presentation"
@@ -162,5 +164,6 @@ export default function ExerciseInfoModal({
         ) : null}
       </div>
     </div>
+    </Portal>
   );
 }

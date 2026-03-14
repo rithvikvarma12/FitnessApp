@@ -15,6 +15,7 @@ import type { WeekPlan, ExerciseMeta } from "../db/types";
 import type { Unit } from "../services/units";
 import { toDisplay } from "../services/units";
 import type { ExerciseHistoryPoint } from "./weekViewTypes";
+import Portal from "./Portal";
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 
@@ -177,6 +178,7 @@ export default function ExerciseHistoryModal({
   if (!open) return null;
 
   return (
+    <Portal>
     <div
       className="modalBackdrop"
       role="presentation"
@@ -290,5 +292,6 @@ export default function ExerciseHistoryModal({
         )}
       </div>
     </div>
+    </Portal>
   );
 }

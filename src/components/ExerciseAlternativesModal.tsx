@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { classifyCompound } from "../db/db";
 import type { AlternativeOption } from "./weekViewTypes";
+import Portal from "./Portal";
 
 interface ExerciseAlternativesModalProps {
   openItem: { exerciseName: string } | null;
@@ -27,6 +28,7 @@ export default function ExerciseAlternativesModal({
   if (!openItem) return null;
 
   return (
+    <Portal>
     <div
       className="modalBackdrop"
       role="presentation"
@@ -88,5 +90,6 @@ export default function ExerciseAlternativesModal({
         )}
       </div>
     </div>
+    </Portal>
   );
 }
