@@ -34,7 +34,8 @@ export async function logoutPurchases(): Promise<void> {
 }
 
 export async function getIsPro(): Promise<boolean> {
-  if (!Capacitor.isNativePlatform()) return false;
+  // On web/PWA, purchases are not available — treat as Pro so gates don't fire
+  if (!Capacitor.isNativePlatform()) return true;
   try {
     const { customerInfo } = await Purchases.getCustomerInfo();
     return ENTITLEMENT_ID in customerInfo.entitlements.active;
