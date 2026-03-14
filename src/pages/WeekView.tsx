@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { useLiveQuery } from "dexie-react-hooks";
-import { classifyCompound, db, getActiveUserId } from "../db/db";
+import { db, getActiveUserId } from "../db/db";
 import type { Unit } from "../services/units";
 import { lbToKg } from "../services/units";
 import type {
@@ -211,6 +211,10 @@ export default function WeekView({ week }: { week: WeekPlan }) {
     const s = await db.settings.get("restTimerEnabled");
     return s?.value !== "false";
   }, [], true);
+  const restDuration = useLiveQuery(async () => {
+    const s = await db.settings.get("restDuration");
+    return Number(s?.value ?? 90);
+  }, [], 90);
   const rawCustomExercises = useLiveQuery(
     async () => activeUserId ? db.customExercises.where("userId").equals(activeUserId).toArray() : [],
     [activeUserId], [] as CustomExercise[]
@@ -290,8 +294,8 @@ export default function WeekView({ week }: { week: WeekPlan }) {
 
   function startRestTimer(exerciseName: string) {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    const type = classifyCompound(exerciseName);
-    const total = type === "compound" ? 90 : 60;
+    const userDuration = restDuration ?? 90;
+    const total = userDuration;
     setTimerExerciseName(exerciseName);
     setTimerRemaining(total);
     setTimerTotal(total);

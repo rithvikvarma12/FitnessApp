@@ -212,6 +212,10 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
     const s = await db.settings.get("restTimerEnabled");
     return s?.value !== "false";
   }, [], true);
+  const restDuration = useLiveQuery(async () => {
+    const s = await db.settings.get("restDuration");
+    return Number(s?.value ?? 90);
+  }, [], 90);
   const theme = useLiveQuery(async () => {
     const s = await db.settings.get("theme");
     return (s?.value ?? "dark") as "dark" | "light";
@@ -608,15 +612,38 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
         Current weight: {latestWeight ? `${toDisplay(latestWeight.weightKg, unit).toFixed(1)} ${unit}` : "No entries yet"}
       </div>
 
-      <div className="row" style={{ marginTop: 12, alignItems: "center", gap: 10 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
-          <input
-            type="checkbox"
-            checked={restTimerEnabled ?? true}
-            onChange={(e) => void db.settings.put({ key: "restTimerEnabled", value: String(e.target.checked) })}
-          />
-          Auto rest timer after set completion
-        </label>
+      <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <button
+          onClick={() => void db.settings.put({ key: "restTimerEnabled", value: String(!(restTimerEnabled ?? true)) })}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            background: restTimerEnabled ? "rgba(59,130,246,0.1)" : "var(--bg-subtle)",
+            border: `1px solid ${restTimerEnabled ? "rgba(59,130,246,0.25)" : "var(--border-glass)"}`,
+            borderRadius: 20, padding: "7px 14px",
+            fontSize: 13, fontWeight: 600,
+            color: restTimerEnabled ? "var(--accent-blue)" : "var(--text-muted)",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <span style={{ fontSize: 15 }}>{restTimerEnabled ? "⏱" : "⏱"}</span>
+          <span>{restTimerEnabled ? "Rest timer on" : "Rest timer off"}</span>
+        </button>
+        {restTimerEnabled && (
+          <button
+            onClick={() => {
+              const next = (restDuration ?? 90) === 60 ? 90 : (restDuration ?? 90) === 90 ? 120 : 60;
+              void db.settings.put({ key: "restDuration", value: String(next) });
+            }}
+            style={{
+              background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.22)",
+              borderRadius: 20, padding: "7px 14px",
+              fontSize: 13, fontWeight: 700,
+              color: "var(--accent-blue)",
+            }}
+          >
+            {restDuration ?? 90}s
+          </button>
+        )}
       </div>
 
       <div className="row" style={{ marginTop: 14, alignItems: "center", gap: 10 }}>

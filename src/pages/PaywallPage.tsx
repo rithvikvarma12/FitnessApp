@@ -81,10 +81,11 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: 1000,
-      background: "var(--bg-base)",
+      position: "fixed", inset: 0, zIndex: 3000,
+      background: "var(--bg-deep)",
       display: "flex", flexDirection: "column",
       overflowY: "auto",
+      WebkitOverflowScrolling: "touch",
     }}>
       {/* Close */}
       <button
