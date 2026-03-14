@@ -346,16 +346,22 @@
 /* ── PR Celebration Overlay — Centered Card ───────────────────────────── */
 
 .pr-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 2000;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: rgba(2, 6, 23, 0.85);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
+  padding: 16px !important;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  overflow: hidden !important;
   animation: pr-overlay-in 0.25s ease forwards;
 }
 
@@ -376,12 +382,12 @@
 /* ── Celebration Card ─────────────────────────────────────────────────── */
 
 .pr-card {
-  position: relative;
+  position: relative !important;
   background: rgba(13, 18, 32, 0.96);
   border: 1px solid rgba(234, 179, 8, 0.3);
-  border-radius: 20px;
-  padding: 28px 24px 20px;
-  width: min(420px, 100%);
+  border-radius: 20px !important;
+  padding: 28px 24px 20px !important;
+  width: min(420px, calc(100% - 32px)) !important;
   text-align: center;
   display: grid;
   gap: 16px;
@@ -389,6 +395,7 @@
   z-index: 1;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  margin: 0 !important;
 }
 
 .pr-card--exit {
