@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Verified — TrainLab</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #060A26;
+      color: #e8ecf4;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 40px 32px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+    }
+    .brand {
+      font-size: 13px;
+      color: #3b82f6;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      margin-bottom: 28px;
+    }
+    .check-circle {
+      width: 72px;
+      height: 72px;
+      background: rgba(16,185,129,0.12);
+      border: 2px solid rgba(16,185,129,0.4);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: #e8ecf4;
+    }
+    p {
+      font-size: 14px;
+      color: #8892a4;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .btn {
+      display: inline-block;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 32px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 0 24px rgba(59,130,246,0.35);
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .fallback {
+      font-size: 12px;
+      color: #5a6478;
+      margin-top: 20px;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">TRAINLAB</div>
+
+    <div class="check-circle">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+           stroke="#10b981" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    </div>
+
+    <h1>Email Verified!</h1>
+    <p>Your email has been confirmed. You can now go back to the TrainLab app and sign in.</p>
+
+    <a class="btn" href="com.trainlab.app://" onclick="handleOpen(event)">Open TrainLab</a>
+
+    <div class="fallback">
+      If the app didn't open, go back to TrainLab and tap<br />
+      <strong style="color: #8892a4">"I've verified my email"</strong>
+    </div>
+  </div>
+
+  <script>
+    function handleOpen(e) {
+      e.preventDefault();
+      window.location.href = 'com.trainlab.app://';
+      setTimeout(function () {
+        document.querySelector('.fallback').style.color = '#c0c8d8';
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

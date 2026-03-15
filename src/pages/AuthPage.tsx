@@ -27,26 +27,41 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  // Poll for session after signup email verification
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // Poll for email verification every 5 seconds by attempting sign-in
   useEffect(() => {
     if (!info) return;
     const interval = setInterval(async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+      const { data } = await supabase.auth.signInWithPassword({ email, password });
+      if (data?.session) {
         clearInterval(interval);
+        setInfo(null);
+        showToast("Email verified!");
         onAuth?.();
       }
-    }, 3000);
+    }, 5000);
     return () => clearInterval(interval);
-  }, [info, onAuth]);
+  }, [info, email, password, onAuth]);
 
   const handleCheckVerification = async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (data?.session) {
+      setInfo(null);
+      showToast("Email verified!");
       onAuth?.();
     } else {
-      setErr("Email not yet verified. Please check your inbox and click the confirmation link.");
+      const msg = (error?.message ?? "").toLowerCase();
+      if (msg.includes("confirm") || msg.includes("verif")) {
+        setErr("Email not verified yet. Please check your inbox and click the confirmation link.");
+      } else {
+        setErr("Email not yet verified. Please check your inbox.");
+      }
     }
   };
 
@@ -118,6 +133,18 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)",
+          color: "#10b981", borderRadius: 10, padding: "10px 20px",
+          fontSize: 14, fontWeight: 600, zIndex: 9999, whiteSpace: "nowrap",
+        }}>
+          {toast}
+        </div>
+      )}
 
       {/* Logo */}
       <div style={{ marginBottom: 6 }}>
