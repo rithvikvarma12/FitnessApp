@@ -54,7 +54,8 @@ workflows:
                   .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen"),
                   .package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications"),
                   .package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake"),
-                  .package(name: "CapgoCapacitorSocialLogin", path: "../../../node_modules/@capgo/capacitor-social-login")
+                  .package(name: "CapgoCapacitorSocialLogin", path: "../../../node_modules/@capgo/capacitor-social-login"),
+                  .package(name: "RevenuecatPurchasesCapacitor", path: "../../../node_modules/@revenuecat/purchases-capacitor")
               ],
               targets: [
                   .target(
@@ -66,7 +67,8 @@ workflows:
                           .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                           .product(name: "CapacitorPushNotifications", package: "CapacitorPushNotifications"),
                           .product(name: "CapacitorCommunityKeepAwake", package: "CapacitorCommunityKeepAwake"),
-                          .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin")
+                          .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin"),
+                          .product(name: "RevenuecatPurchasesCapacitor", package: "RevenuecatPurchasesCapacitor")
                       ]
                   )
               ]
