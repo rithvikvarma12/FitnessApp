@@ -5,6 +5,13 @@ export const ENTITLEMENT_ID = "Pro";
 export const OFFERING_ID = "trainlab_pro";
 const REVENUECAT_APPLE_KEY = "appl_XEYpcIKAbOASwyRQgYMRjnrRBwm";
 
+// Resolves once initPurchases() completes (or immediately on web)
+let _resolvePurchasesReady!: () => void;
+export const purchasesReady = new Promise<void>(resolve => {
+  _resolvePurchasesReady = resolve;
+});
+if (!Capacitor.isNativePlatform()) _resolvePurchasesReady();
+
 export async function initPurchases(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
@@ -13,6 +20,8 @@ export async function initPurchases(): Promise<void> {
     console.log("[RC] Purchases configured");
   } catch (e) {
     console.error("[RC] initPurchases failed:", e);
+  } finally {
+    _resolvePurchasesReady();
   }
 }
 

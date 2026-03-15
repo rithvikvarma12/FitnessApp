@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getOffering, purchasePackage, restorePurchases } from "../lib/purchases";
+import { getOffering, purchasePackage, restorePurchases, purchasesReady } from "../lib/purchases";
 import { useProContext } from "../lib/ProContext";
 import { Capacitor } from "@capacitor/core";
 
@@ -42,37 +42,56 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
   const [offeringErr, setOfferingErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState("");
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
       console.log("[Paywall] Non-native platform — skipping offering fetch");
+      setDebugInfo("Non-native platform — purchases not available");
       setLoadingOffering(false);
       return;
     }
-    console.log("[Paywall] Fetching offering…");
-    getOffering()
-      .then((offering) => {
+
+    (async () => {
+      try {
+        setDebugInfo("Waiting for RC to initialize...");
+        console.log("[Paywall] Waiting for purchasesReady...");
+        await purchasesReady;
+
+        setDebugInfo("Fetching offerings...");
+        console.log("[Paywall] Fetching offering…");
+        const offering = await getOffering();
+
         console.log("[Paywall] Offering result:", offering);
+        const pkgCount = offering?.availablePackages?.length ?? 0;
+        setDebugInfo(
+          `Offering: ${offering?.identifier ?? "null"} | packages: ${pkgCount}` +
+          (pkgCount > 0 ? " | " + (offering!.availablePackages as PurchasePackage[]).map(p => `${p.identifier}=${p.product.priceString}`).join(", ") : "")
+        );
+
         if (!offering || !offering.availablePackages?.length) {
           console.warn("[Paywall] No packages in offering:", offering);
           setOfferingErr("Unable to load subscription options. Please try again later.");
           return;
         }
+
         const pkgs = offering.availablePackages as PurchasePackage[];
         console.log("[Paywall] Packages:", pkgs.map(p => `${p.identifier} — ${p.product.priceString}`));
         setPackages(pkgs);
-        // Default to monthly if present, otherwise first
         const monthly = pkgs.find(p =>
           p.identifier.toLowerCase().includes("month") ||
           p.product.subscriptionPeriod?.includes("M")
         );
         setSelectedId((monthly ?? pkgs[0]).identifier);
-      })
-      .catch((e) => {
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : JSON.stringify(e);
         console.error("[Paywall] getOffering threw:", e);
+        setDebugInfo("Error: " + msg);
         setOfferingErr("Unable to load subscription options. Please try again later.");
-      })
-      .finally(() => setLoadingOffering(false));
+      } finally {
+        setLoadingOffering(false);
+      }
+    })();
   }, []);
 
   const selectedPkg = packages.find(p => p.identifier === selectedId) ?? null;
@@ -309,6 +328,13 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
         ) : (
           <div className="card" style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
             In-app purchases are available on iOS. Download the app to subscribe.
+          </div>
+        )}
+
+        {/* Debug info — remove before release */}
+        {debugInfo && (
+          <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 8, wordBreak: "break-all" }}>
+            {debugInfo}
           </div>
         )}
 
