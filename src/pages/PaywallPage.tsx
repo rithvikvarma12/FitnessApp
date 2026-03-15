@@ -17,6 +17,13 @@ type PurchasePackage = {
   };
 };
 
+type FallbackPlan = { id: "monthly" | "annual"; label: string; price: string; period: string; badge?: string };
+
+const FALLBACK_PLANS: FallbackPlan[] = [
+  { id: "monthly", label: "Monthly", price: "$4.99", period: "/ month" },
+  { id: "annual",  label: "Annual",  price: "$39.99", period: "/ year", badge: "Save 33%" },
+];
+
 const FEATURES = [
   { icon: "🔄", text: "Adjust remaining days mid-week" },
   { icon: "📊", text: "Full nutrition logging & analytics" },
@@ -39,55 +46,37 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadingOffering, setLoadingOffering] = useState(true);
-  const [offeringErr, setOfferingErr] = useState<string | null>(null);
+  const [offeringsAvailable, setOfferingsAvailable] = useState(false);
+  // Fallback selection when offerings unavailable
+  const [fallbackSelected, setFallbackSelected] = useState<"monthly" | "annual">("monthly");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState("");
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
-      console.log("[Paywall] Non-native platform — skipping offering fetch");
-      setDebugInfo("Non-native platform — purchases not available");
       setLoadingOffering(false);
       return;
     }
 
     (async () => {
       try {
-        setDebugInfo("Waiting for RC to initialize...");
-        console.log("[Paywall] Waiting for purchasesReady...");
         await purchasesReady;
-
-        setDebugInfo("Fetching offerings...");
-        console.log("[Paywall] Fetching offering…");
         const offering = await getOffering();
+        console.log("[Paywall] Offering result:", offering?.identifier ?? "null",
+          "packages:", offering?.availablePackages?.length ?? 0);
 
-        console.log("[Paywall] Offering result:", offering);
-        const pkgCount = offering?.availablePackages?.length ?? 0;
-        setDebugInfo(
-          `Offering: ${offering?.identifier ?? "null"} | packages: ${pkgCount}` +
-          (pkgCount > 0 ? " | " + (offering!.availablePackages as PurchasePackage[]).map(p => `${p.identifier}=${p.product.priceString}`).join(", ") : "")
-        );
-
-        if (!offering || !offering.availablePackages?.length) {
-          console.warn("[Paywall] No packages in offering:", offering);
-          setOfferingErr("Unable to load subscription options. Please try again later.");
-          return;
+        if (offering?.availablePackages?.length) {
+          const pkgs = offering.availablePackages as PurchasePackage[];
+          setPackages(pkgs);
+          const monthly = pkgs.find(p =>
+            p.identifier.toLowerCase().includes("month") ||
+            p.product.subscriptionPeriod?.includes("M")
+          );
+          setSelectedId((monthly ?? pkgs[0]).identifier);
+          setOfferingsAvailable(true);
         }
-
-        const pkgs = offering.availablePackages as PurchasePackage[];
-        console.log("[Paywall] Packages:", pkgs.map(p => `${p.identifier} — ${p.product.priceString}`));
-        setPackages(pkgs);
-        const monthly = pkgs.find(p =>
-          p.identifier.toLowerCase().includes("month") ||
-          p.product.subscriptionPeriod?.includes("M")
-        );
-        setSelectedId((monthly ?? pkgs[0]).identifier);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : JSON.stringify(e);
-        console.error("[Paywall] getOffering threw:", e);
-        setDebugInfo("Error: " + msg);
-        setOfferingErr("Unable to load subscription options. Please try again later.");
+      } catch (e) {
+        console.error("[Paywall] getOffering error:", e);
       } finally {
         setLoadingOffering(false);
       }
@@ -97,9 +86,9 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
   const selectedPkg = packages.find(p => p.identifier === selectedId) ?? null;
 
   const handlePurchase = async () => {
-    console.log("[Paywall] Purchase tapped. selectedPkg:", selectedPkg?.identifier ?? "null");
-    if (!selectedPkg) {
-      setErr("No package selected. Please try again.");
+    // Offerings not loaded — show friendly message
+    if (!offeringsAvailable || !selectedPkg) {
+      setErr("Subscription will be available shortly. Please try again in a few minutes.");
       return;
     }
     setBusy(true);
@@ -116,7 +105,7 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error("[Paywall] purchasePackage error:", msg, e);
+      console.error("[Paywall] purchasePackage error:", msg);
       if (!msg.toLowerCase().includes("cancel")) {
         setErr("Purchase failed. Please try again or restore purchases.");
       }
@@ -126,7 +115,6 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
   };
 
   const handleRestore = async () => {
-    console.log("[Paywall] Restore tapped");
     setBusy(true);
     setErr(null);
     try {
@@ -148,6 +136,21 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
 
   const hasTrial = selectedPkg?.product.introPrice != null;
   const ctaLabel = busy ? "Processing…" : hasTrial ? "Start 7-Day Free Trial" : "Upgrade to Pro";
+
+  // Build display plans — real or fallback
+  const displayPlans: { id: string; label: string; price: string; period: string; badge?: string; hasTrial?: boolean }[] =
+    offeringsAvailable
+      ? packages.map(pkg => ({
+          id: pkg.identifier,
+          label: pkg.identifier.toLowerCase().includes("annual") || pkg.product.subscriptionPeriod?.includes("Y")
+            ? "Annual" : "Monthly",
+          price: pkg.product.priceString,
+          period: periodLabel(pkg.product.subscriptionPeriod),
+          hasTrial: pkg.product.introPrice != null,
+        }))
+      : FALLBACK_PLANS.map(p => ({ ...p }));
+
+  const currentSelectedId = offeringsAvailable ? selectedId : fallbackSelected;
 
   return (
     <div style={{
@@ -197,7 +200,7 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
 
             {/* Loading state */}
             {loadingOffering && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 0", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 0" }}>
                 <style>{`
                   @keyframes db-bounce {
                     0%, 100% { transform: translateY(0); }
@@ -221,24 +224,18 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
               </div>
             )}
 
-            {/* Offering error */}
-            {!loadingOffering && offeringErr && (
-              <div className="tag tag--red" style={{ padding: "8px 12px", fontSize: 13, textAlign: "center" }}>
-                {offeringErr}
-              </div>
-            )}
-
-            {/* Package picker */}
-            {!loadingOffering && packages.length > 1 && (
+            {/* Plan picker — shown once loading is done */}
+            {!loadingOffering && displayPlans.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {packages.map((pkg) => {
-                  const isSelected = pkg.identifier === selectedId;
-                  const period = periodLabel(pkg.product.subscriptionPeriod);
-                  const hasPkgTrial = pkg.product.introPrice != null;
+                {displayPlans.map((plan) => {
+                  const isSelected = plan.id === currentSelectedId;
                   return (
                     <button
-                      key={pkg.identifier}
-                      onClick={() => setSelectedId(pkg.identifier)}
+                      key={plan.id}
+                      onClick={() => {
+                        if (offeringsAvailable) setSelectedId(plan.id);
+                        else setFallbackSelected(plan.id as "monthly" | "annual");
+                      }}
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "14px 16px", borderRadius: 12, cursor: "pointer",
@@ -249,22 +246,25 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
                     >
                       <div style={{ textAlign: "left" }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
-                          {pkg.identifier.toLowerCase().includes("annual") || pkg.product.subscriptionPeriod?.includes("Y")
-                            ? "Annual"
-                            : "Monthly"}
+                          {plan.label}
                         </div>
-                        {hasPkgTrial && (
+                        {plan.hasTrial && (
                           <div style={{ fontSize: 11, color: "var(--accent-blue)", fontWeight: 600 }}>
                             7-day free trial
+                          </div>
+                        )}
+                        {plan.badge && !plan.hasTrial && (
+                          <div style={{ fontSize: 11, color: "var(--accent-blue)", fontWeight: 600 }}>
+                            {plan.badge}
                           </div>
                         )}
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
-                          {pkg.product.priceString}
+                          {plan.price}
                         </div>
-                        {period && (
-                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{period}</div>
+                        {plan.period && (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{plan.period}</div>
                         )}
                       </div>
                     </button>
@@ -273,18 +273,10 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
               </div>
             )}
 
-            {/* Single package — just show price */}
-            {!loadingOffering && packages.length === 1 && (
-              <div style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
-                {selectedPkg?.product.priceString}{" "}
-                {periodLabel(selectedPkg?.product.subscriptionPeriod)} · Cancel anytime
-              </div>
-            )}
-
             {/* Purchase button */}
-            {!loadingOffering && !offeringErr && (
+            {!loadingOffering && (
               <button
-                disabled={busy || !selectedPkg}
+                disabled={busy}
                 onClick={() => void handlePurchase()}
                 style={{ fontSize: 16, padding: "14px", fontWeight: 700 }}
               >
@@ -292,8 +284,8 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
               </button>
             )}
 
-            {/* Trial sub-label */}
-            {!loadingOffering && hasTrial && selectedPkg && (
+            {/* Trial sub-label (only when offerings loaded) */}
+            {!loadingOffering && offeringsAvailable && hasTrial && selectedPkg && (
               <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)" }}>
                 then {selectedPkg.product.priceString} {periodLabel(selectedPkg.product.subscriptionPeriod)} · Cancel anytime
               </div>
@@ -328,13 +320,6 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
         ) : (
           <div className="card" style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
             In-app purchases are available on iOS. Download the app to subscribe.
-          </div>
-        )}
-
-        {/* Debug info — remove before release */}
-        {debugInfo && (
-          <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 8, wordBreak: "break-all" }}>
-            {debugInfo}
           </div>
         )}
 
