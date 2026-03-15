@@ -62,8 +62,6 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
       try {
         await purchasesReady;
         const offering = await getOffering();
-        console.log("[Paywall] Offering result:", offering?.identifier ?? "null",
-          "packages:", offering?.availablePackages?.length ?? 0);
 
         if (offering?.availablePackages?.length) {
           const pkgs = offering.availablePackages as PurchasePackage[];
@@ -94,9 +92,7 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
     setBusy(true);
     setErr(null);
     try {
-      console.log("[Paywall] Calling purchasePackage:", selectedPkg.identifier);
       const isPro = await purchasePackage(selectedPkg);
-      console.log("[Paywall] Purchase result isPro:", isPro);
       if (isPro) {
         await refresh();
         onClose();
@@ -119,7 +115,6 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
     setErr(null);
     try {
       const isPro = await restorePurchases();
-      console.log("[Paywall] Restore result isPro:", isPro);
       if (isPro) {
         await refresh();
         onClose();

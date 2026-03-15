@@ -15,9 +15,8 @@ if (!Capacitor.isNativePlatform()) _resolvePurchasesReady();
 export async function initPurchases(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
-    await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG });
+    await Purchases.setLogLevel({ level: LOG_LEVEL.ERROR });
     await Purchases.configure({ apiKey: REVENUECAT_APPLE_KEY });
-    console.log("[RC] Purchases configured");
   } catch (e) {
     console.error("[RC] initPurchases failed:", e);
   } finally {
@@ -57,11 +56,7 @@ export async function getIsPro(): Promise<boolean> {
 export async function getOffering() {
   if (!Capacitor.isNativePlatform()) return null;
   const offerings = await Purchases.getOfferings();
-  console.log("[RC] getOfferings raw result:", JSON.stringify(offerings));
-  const offering = offerings.current ?? offerings.all?.[OFFERING_ID] ?? null;
-  console.log("[RC] resolved offering:", offering?.identifier ?? "null",
-    "packages:", offering?.availablePackages?.map(p => p.identifier) ?? []);
-  return offering;
+  return offerings.current ?? offerings.all?.[OFFERING_ID] ?? null;
 }
 
 export async function purchasePackage(pkg: { identifier: string; offeringIdentifier: string }) {
