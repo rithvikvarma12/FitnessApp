@@ -7,6 +7,16 @@ interface PaywallPageProps {
   onClose: () => void;
 }
 
+type PurchasePackage = {
+  identifier: string;
+  offeringIdentifier: string;
+  product: {
+    priceString: string;
+    subscriptionPeriod?: string;
+    introPrice?: { priceString: string } | null;
+  };
+};
+
 const FEATURES = [
   { icon: "🔄", text: "Adjust remaining days mid-week" },
   { icon: "📊", text: "Full nutrition logging & analytics" },
@@ -16,27 +26,69 @@ const FEATURES = [
   { icon: "📈", text: "Full progress analytics" },
 ];
 
+function periodLabel(period?: string): string {
+  if (!period) return "";
+  if (period.includes("Y")) return "/ year";
+  if (period.includes("M") && !period.includes("D")) return "/ month";
+  if (period.includes("W")) return "/ week";
+  return "";
+}
+
 export default function PaywallPage({ onClose }: PaywallPageProps) {
   const { refresh } = useProContext();
-  const [pkg, setPkg] = useState<{ identifier: string; offeringIdentifier: string; product: { priceString: string; introPrice?: { priceString: string } | null } } | null>(null);
+  const [packages, setPackages] = useState<PurchasePackage[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loadingOffering, setLoadingOffering] = useState(true);
+  const [offeringErr, setOfferingErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    getOffering().then((offering) => {
-      if (offering?.availablePackages?.length) {
-        setPkg(offering.availablePackages[0] as typeof pkg);
-      }
-    });
+    if (!Capacitor.isNativePlatform()) {
+      console.log("[Paywall] Non-native platform — skipping offering fetch");
+      setLoadingOffering(false);
+      return;
+    }
+    console.log("[Paywall] Fetching offering…");
+    getOffering()
+      .then((offering) => {
+        console.log("[Paywall] Offering result:", offering);
+        if (!offering || !offering.availablePackages?.length) {
+          console.warn("[Paywall] No packages in offering:", offering);
+          setOfferingErr("Unable to load subscription options. Please try again later.");
+          return;
+        }
+        const pkgs = offering.availablePackages as PurchasePackage[];
+        console.log("[Paywall] Packages:", pkgs.map(p => `${p.identifier} — ${p.product.priceString}`));
+        setPackages(pkgs);
+        // Default to monthly if present, otherwise first
+        const monthly = pkgs.find(p =>
+          p.identifier.toLowerCase().includes("month") ||
+          p.product.subscriptionPeriod?.includes("M")
+        );
+        setSelectedId((monthly ?? pkgs[0]).identifier);
+      })
+      .catch((e) => {
+        console.error("[Paywall] getOffering threw:", e);
+        setOfferingErr("Unable to load subscription options. Please try again later.");
+      })
+      .finally(() => setLoadingOffering(false));
   }, []);
 
+  const selectedPkg = packages.find(p => p.identifier === selectedId) ?? null;
+
   const handlePurchase = async () => {
-    if (!pkg) return;
+    console.log("[Paywall] Purchase tapped. selectedPkg:", selectedPkg?.identifier ?? "null");
+    if (!selectedPkg) {
+      setErr("No package selected. Please try again.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
-      const isPro = await purchasePackage(pkg);
+      console.log("[Paywall] Calling purchasePackage:", selectedPkg.identifier);
+      const isPro = await purchasePackage(selectedPkg);
+      console.log("[Paywall] Purchase result isPro:", isPro);
       if (isPro) {
         await refresh();
         onClose();
@@ -45,8 +97,9 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("cancelled") && !msg.includes("cancel")) {
-        setErr("Unable to connect to App Store. Please try again later.");
+      console.error("[Paywall] purchasePackage error:", msg, e);
+      if (!msg.toLowerCase().includes("cancel")) {
+        setErr("Purchase failed. Please try again or restore purchases.");
       }
     } finally {
       setBusy(false);
@@ -54,30 +107,28 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
   };
 
   const handleRestore = async () => {
+    console.log("[Paywall] Restore tapped");
     setBusy(true);
     setErr(null);
     try {
       const isPro = await restorePurchases();
+      console.log("[Paywall] Restore result isPro:", isPro);
       if (isPro) {
         await refresh();
         onClose();
       } else {
         setErr("No active subscription found.");
       }
-    } catch {
+    } catch (e) {
+      console.error("[Paywall] restorePurchases error:", e);
       setErr("Restore failed. Please try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  const trialLabel = pkg?.product.introPrice?.priceString
-    ? `Start 7-Day Free Trial`
-    : "Upgrade to Pro";
-
-  const priceLabel = pkg?.product.priceString
-    ? `then ${pkg.product.priceString}/month`
-    : "";
+  const hasTrial = selectedPkg?.product.introPrice != null;
+  const ctaLabel = busy ? "Processing…" : hasTrial ? "Start 7-Day Free Trial" : "Upgrade to Pro";
 
   return (
     <div style={{
@@ -124,18 +175,92 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
         {/* CTA */}
         {Capacitor.isNativePlatform() ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <button
-              disabled={busy}
-              onClick={() => void handlePurchase()}
-              style={{ fontSize: 16, padding: "14px", fontWeight: 700 }}
-            >
-              {busy ? "Processing…" : trialLabel}
-            </button>
-            {priceLabel && (
-              <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)" }}>
-                {priceLabel} · Cancel anytime
+
+            {/* Loading state */}
+            {loadingOffering && (
+              <div style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)", padding: "16px 0" }}>
+                Loading subscription options…
               </div>
             )}
+
+            {/* Offering error */}
+            {!loadingOffering && offeringErr && (
+              <div className="tag tag--red" style={{ padding: "8px 12px", fontSize: 13, textAlign: "center" }}>
+                {offeringErr}
+              </div>
+            )}
+
+            {/* Package picker */}
+            {!loadingOffering && packages.length > 1 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {packages.map((pkg) => {
+                  const isSelected = pkg.identifier === selectedId;
+                  const period = periodLabel(pkg.product.subscriptionPeriod);
+                  const hasPkgTrial = pkg.product.introPrice != null;
+                  return (
+                    <button
+                      key={pkg.identifier}
+                      onClick={() => setSelectedId(pkg.identifier)}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "14px 16px", borderRadius: 12, cursor: "pointer",
+                        background: isSelected ? "rgba(59,130,246,0.15)" : "var(--bg-surface)",
+                        border: isSelected ? "2px solid var(--accent-blue)" : "2px solid var(--border-glass)",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <div style={{ textAlign: "left" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
+                          {pkg.identifier.toLowerCase().includes("annual") || pkg.product.subscriptionPeriod?.includes("Y")
+                            ? "Annual"
+                            : "Monthly"}
+                        </div>
+                        {hasPkgTrial && (
+                          <div style={{ fontSize: 11, color: "var(--accent-blue)", fontWeight: 600 }}>
+                            7-day free trial
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
+                          {pkg.product.priceString}
+                        </div>
+                        {period && (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{period}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Single package — just show price */}
+            {!loadingOffering && packages.length === 1 && (
+              <div style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
+                {selectedPkg?.product.priceString}{" "}
+                {periodLabel(selectedPkg?.product.subscriptionPeriod)} · Cancel anytime
+              </div>
+            )}
+
+            {/* Purchase button */}
+            {!loadingOffering && !offeringErr && (
+              <button
+                disabled={busy || !selectedPkg}
+                onClick={() => void handlePurchase()}
+                style={{ fontSize: 16, padding: "14px", fontWeight: 700 }}
+              >
+                {ctaLabel}
+              </button>
+            )}
+
+            {/* Trial sub-label */}
+            {!loadingOffering && hasTrial && selectedPkg && (
+              <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)" }}>
+                then {selectedPkg.product.priceString} {periodLabel(selectedPkg.product.subscriptionPeriod)} · Cancel anytime
+              </div>
+            )}
+
             <button
               className="secondary"
               disabled={busy}
@@ -144,11 +269,13 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
             >
               Restore Purchases
             </button>
+
             {err && (
               <div className="tag tag--red" style={{ padding: "6px 10px", fontSize: 12, textAlign: "center" }}>
                 {err}
               </div>
             )}
+
             <button
               onClick={onClose}
               style={{
