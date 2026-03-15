@@ -3,13 +3,11 @@ import { db } from "../db/db";
 import type { UserProfile } from "../db/types";
 import { ensureSeedData } from "../db/seed";
 import { createFirstWeekIfMissing } from "../services/planGenerator";
-import { initDemoPresetForUser } from "../services/presets";
 import { deriveAutoCardio, defaultCardioTypeForGoal } from "../services/cardio";
 import { fromDisplay, toDisplay } from "../services/units";
 import { generateNutritionSettings, defaultActivityMultiplier } from "../services/nutritionCalculator";
 import { supabase } from "../lib/supabase";
 
-type PresetKey = "generic" | "demo";
 
 const HOME_EQUIPMENT_OPTIONS: { key: string; label: string }[] = [
   { key: "dumbbells",        label: "Dumbbells" },
@@ -71,32 +69,9 @@ const baseGeneric = withAutoCardio({
 });
 
 
-const baseDemo = withAutoCardio({
-  name: "Demo Profile",
-  unit: "kg",
-  daysPerWeek: 5,
-  goalMode: "cut",
-  currentWeight: "86",
-  targetWeight: "78",
-  experience: "intermediate",
-  equipment: "gym",
-  homeEquipment: [],
-  volumePreference: "moderate" as const,
-  notes: "Demo sample data preset",
-  heightCm: "178",
-  age: "28",
-  gender: "male",
-});
-
-function presetDefaults(preset: PresetKey): FormState {
-  if (preset === "demo") return { ...baseDemo };
-  return { ...baseGeneric };
-}
-
 interface SetupPageProps { onDone?: () => void; supabaseProfileId?: string; }
 export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps = {}) {
-  const [preset, setPreset] = useState<PresetKey>("generic");
-  const [form, setForm] = useState<FormState>(presetDefaults("generic"));
+  const [form, setForm] = useState<FormState>({ ...baseGeneric });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [volumeMsg, setVolumeMsg] = useState<string | null>(null);
@@ -126,11 +101,6 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
       }
       return next;
     });
-  };
-
-  const handlePresetChange = (value: PresetKey) => {
-    setPreset(value);
-    setForm(presetDefaults(value));
   };
 
   const createProfile = async () => {
@@ -163,9 +133,7 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
 
       const profile: UserProfile = {
         id: supabaseProfileId ?? crypto.randomUUID(),
-        name:
-          form.name.trim() ||
-          (preset === "demo" ? "Demo profile" : "Default"),
+        name: form.name.trim() || "Default",
         unit: form.unit,
         daysPerWeek: form.daysPerWeek,
         goalMode: form.goalMode,
@@ -283,11 +251,7 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
       } catch { /* ignore */ }
       await ensureSeedData();
 
-      if (preset === "demo") {
-        await initDemoPresetForUser(profile.id);
-      } else {
-        await createFirstWeekIfMissing({ userId: profile.id, weekNumber: 1 });
-      }
+      await createFirstWeekIfMissing({ userId: profile.id, weekNumber: 1 });
       // Sync first week plan to Supabase
       try {
         db.weekPlans.where("userId").equals(profile.id).first().then(w => {
@@ -330,23 +294,13 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
         Create your first profile to get started.
       </div>
 
-      <div className="row">
-        <div className="col">
-          {fl("Preset")}
-          <select value={preset} onChange={(e) => handlePresetChange(e.target.value as PresetKey)}>
-            <option value="generic">Start Fresh</option>
-            <option value="demo">Demo</option>
-          </select>
-        </div>
-
-        <div className="col">
-          {fl("Profile name (optional)")}
-          <input
-            placeholder="e.g., Rithvik / Home Cut"
-            value={form.name}
-            onChange={(e) => setField("name", e.target.value)}
-          />
-        </div>
+      <div>
+        {fl("Profile name (optional)")}
+        <input
+          placeholder="e.g. John"
+          value={form.name}
+          onChange={(e) => setField("name", e.target.value)}
+        />
       </div>
 
 

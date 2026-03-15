@@ -16,7 +16,8 @@ let package = Package(
         .package(name: "CapacitorHaptics", path: "..\..\..\node_modules\@capacitor\haptics"),
         .package(name: "CapacitorPushNotifications", path: "..\..\..\node_modules\@capacitor\push-notifications"),
         .package(name: "CapacitorSplashScreen", path: "..\..\..\node_modules\@capacitor\splash-screen"),
-        .package(name: "CapgoCapacitorSocialLogin", path: "..\..\..\node_modules\@capgo\capacitor-social-login")
+        .package(name: "CapgoCapacitorSocialLogin", path: "..\..\..\node_modules\@capgo\capacitor-social-login"),
+        .package(name: "RevenuecatPurchasesCapacitor", path: "..\..\..\node_modules\@revenuecat\purchases-capacitor")
     ],
     targets: [
         .target(
@@ -28,7 +29,8 @@ let package = Package(
                 .product(name: "CapacitorHaptics", package: "CapacitorHaptics"),
                 .product(name: "CapacitorPushNotifications", package: "CapacitorPushNotifications"),
                 .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
-                .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin")
+                .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin"),
+                .product(name: "RevenuecatPurchasesCapacitor", package: "RevenuecatPurchasesCapacitor")
             ]
         )
     ]
