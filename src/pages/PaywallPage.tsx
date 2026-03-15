@@ -178,8 +178,27 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
 
             {/* Loading state */}
             {loadingOffering && (
-              <div style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)", padding: "16px 0" }}>
-                Loading subscription options…
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 0", gap: 12 }}>
+                <style>{`
+                  @keyframes db-bounce {
+                    0%, 100% { transform: translateY(0); }
+                    50%       { transform: translateY(-12px); }
+                  }
+                  .paywall-db { animation: db-bounce 1s ease-in-out infinite; }
+                `}</style>
+                <svg
+                  className="paywall-db"
+                  viewBox="0 0 64 64" fill="none"
+                  stroke="var(--accent-blue)" strokeWidth="3"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  style={{ width: 48, height: 48, opacity: 0.7 }}
+                >
+                  <rect x="4" y="26" width="12" height="12" rx="3" />
+                  <rect x="14" y="22" width="8" height="20" rx="2" />
+                  <rect x="48" y="26" width="12" height="12" rx="3" />
+                  <rect x="42" y="22" width="8" height="20" rx="2" />
+                  <line x1="22" y1="32" x2="42" y2="32" strokeWidth="5" />
+                </svg>
               </div>
             )}
 
