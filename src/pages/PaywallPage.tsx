@@ -322,6 +322,25 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
         <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6 }}>
           Payment will be charged to your Apple ID. Subscription renews automatically unless cancelled at least 24 hours before the end of the current period. You can manage or cancel subscriptions in App Store settings.
         </div>
+
+        {/* Policy links */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-muted)", marginTop: -8, marginBottom: 4 }}>
+          <a
+            href="https://fitness-app-jet-nine.vercel.app/privacy-policy.html"
+            onClick={(e) => { e.preventDefault(); window.open("https://fitness-app-jet-nine.vercel.app/privacy-policy.html", "_system"); }}
+            style={{ color: "var(--text-muted)", textDecoration: "underline", cursor: "pointer" }}
+          >
+            Privacy Policy
+          </a>
+          <span>·</span>
+          <a
+            href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+            onClick={(e) => { e.preventDefault(); window.open("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/", "_system"); }}
+            style={{ color: "var(--text-muted)", textDecoration: "underline", cursor: "pointer" }}
+          >
+            Terms of Use
+          </a>
+        </div>
       </div>
     </div>
   );
