@@ -129,7 +129,7 @@ workflows:
       - name: Increment build number
         script: |
           cd $CM_BUILD_DIR/ios/App
-          agvtool new-version -all $PROJECT_BUILD_NUMBER
+          agvtool new-version -all $(($BUILD_NUMBER + 60))
       - name: Build IPA
         script: |
           xcode-project build-ipa \
