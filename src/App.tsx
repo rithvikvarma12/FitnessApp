@@ -195,12 +195,12 @@ export default function App() {
   };
 
   if (!ready) {
-    return <></>;
+    return <div style={{ position: "fixed", inset: 0, background: "#060A26" }} />;
   }
 
   // session === undefined means still loading; null means logged out
   if (session === undefined) {
-    return <></>;
+    return <div style={{ position: "fixed", inset: 0, background: "#060A26" }} />;
   }
 
   if (session === null) {
@@ -217,7 +217,7 @@ export default function App() {
 
   // Still fetching the Supabase profile for this session
   if (supabaseProfile === undefined) {
-    return <></>;
+    return <div style={{ position: "fixed", inset: 0, background: "#060A26" }} />;
   }
 
   const showWelcome = (!activeUserId || (profiles?.length ?? 0) === 0) && !showSetup;

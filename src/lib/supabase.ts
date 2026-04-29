@@ -7,14 +7,27 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishabl
 
 const capacitorStorage = {
   getItem: async (key: string) => {
-    const { value } = await Preferences.get({ key });
-    return value;
+    try {
+      const { value } = await Preferences.get({ key });
+      return value;
+    } catch (e) {
+      console.error('Preferences.get failed:', key, e);
+      return null;
+    }
   },
   setItem: async (key: string, value: string) => {
-    await Preferences.set({ key, value });
+    try {
+      await Preferences.set({ key, value });
+    } catch (e) {
+      console.error('Preferences.set failed:', key, e);
+    }
   },
   removeItem: async (key: string) => {
-    await Preferences.remove({ key });
+    try {
+      await Preferences.remove({ key });
+    } catch (e) {
+      console.error('Preferences.remove failed:', key, e);
+    }
   },
 };
 
