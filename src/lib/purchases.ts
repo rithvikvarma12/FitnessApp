@@ -1,6 +1,8 @@
 import { Purchases, LOG_LEVEL } from "@revenuecat/purchases-capacitor";
 import { Capacitor } from "@capacitor/core";
-import { supabase } from "./supabase";
+import { Preferences } from "@capacitor/preferences";
+import { supabase, EXPECTED_STORAGE_KEY } from "./supabase";
+import { getDebugLog } from "./debugLog";
 
 export const ENTITLEMENT_ID = "Pro";
 export const OFFERING_ID = "trainlab_pro";
@@ -60,6 +62,14 @@ export interface ProDebugInfo {
   revenueCatIsPro: boolean | null;
   sessionError?: string;
   revenueCatError?: string;
+  // Storage diagnostics
+  expectedStorageKey: string;
+  preferencesKeys: string[] | null;
+  expectedKeyPresent: boolean;
+  expectedKeyLength: number | null;
+  preferencesError?: string;
+  // Auth log captured by signIn/signUp/storage adapter
+  authLog: { ts: string; msg: string; data?: unknown }[];
 }
 
 export async function getProStatus(): Promise<{ isPro: boolean; debug: ProDebugInfo }> {
@@ -74,11 +84,29 @@ export async function getProStatus(): Promise<{ isPro: boolean; debug: ProDebugI
     identities: null,
     reviewerMatch: false,
     revenueCatIsPro: null,
+    expectedStorageKey: EXPECTED_STORAGE_KEY,
+    preferencesKeys: null,
+    expectedKeyPresent: false,
+    expectedKeyLength: null,
+    authLog: getDebugLog(),
   };
 
   // On web/PWA, purchases are not available — treat as Pro so gates don't fire
   if (!Capacitor.isNativePlatform()) {
     return { isPro: true, debug };
+  }
+
+  // Snapshot Preferences state at debug-panel render time
+  try {
+    const { keys } = await Preferences.keys();
+    debug.preferencesKeys = keys;
+    debug.expectedKeyPresent = keys.includes(EXPECTED_STORAGE_KEY);
+    if (debug.expectedKeyPresent) {
+      const stored = await Preferences.get({ key: EXPECTED_STORAGE_KEY });
+      debug.expectedKeyLength = stored.value?.length ?? null;
+    }
+  } catch (e) {
+    debug.preferencesError = e instanceof Error ? e.message : String(e);
   }
 
   // Reviewer bypass — grants Pro to App Store / Google Play reviewers
