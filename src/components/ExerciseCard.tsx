@@ -1,6 +1,6 @@
 import type { PlannedExercise, SetEntry } from "../db/types";
 import type { Unit } from "../services/units";
-import { toDisplay, fromDisplay } from "../services/units";
+import { toDisplayRounded, fromDisplay } from "../services/units";
 import RestTimer from "./RestTimer";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
@@ -108,7 +108,7 @@ export default function ExerciseCard({
             disabled={isLocked}
             inputMode="decimal"
             placeholder={`Base ${unit}`}
-            value={typeof ex.plannedWeightKg === "number" ? toDisplay(ex.plannedWeightKg, unit) : ""}
+            value={typeof ex.plannedWeightKg === "number" ? toDisplayRounded(ex.plannedWeightKg, unit) : ""}
             onChange={(e) => {
               const v = e.target.value.trim();
               const num = v === "" ? undefined : Number(v);
@@ -138,9 +138,9 @@ export default function ExerciseCard({
         {ex.sets.map((s) => {
           const plannedWtPlaceholder =
             typeof s.plannedWeightKg === "number"
-              ? String(toDisplay(s.plannedWeightKg, unit))
+              ? String(toDisplayRounded(s.plannedWeightKg, unit))
               : typeof ex.plannedWeightKg === "number"
-              ? String(toDisplay(ex.plannedWeightKg, unit))
+              ? String(toDisplayRounded(ex.plannedWeightKg, unit))
               : unit;
           return (
             <div key={s.setNumber} className={`set-grid ${s.completed ? "set-row-done" : ""}`}>
@@ -150,7 +150,7 @@ export default function ExerciseCard({
                 disabled={isLocked}
                 inputMode="decimal"
                 placeholder={plannedWtPlaceholder}
-                value={typeof s.actualWeightKg === "number" ? toDisplay(s.actualWeightKg, unit) : ""}
+                value={typeof s.actualWeightKg === "number" ? toDisplayRounded(s.actualWeightKg, unit) : ""}
                 className={s.completed ? "input-done" : ""}
                 onChange={(e) => {
                   const v = e.target.value.trim();

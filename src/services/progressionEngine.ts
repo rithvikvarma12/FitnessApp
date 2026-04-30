@@ -1,4 +1,5 @@
 import type { PlannedExercise } from "../db/types";
+import { kgToLb, lbToKg, roundToPlateIncrement } from "./units";
 
 export type WeightUnit = "kg" | "lb";
 
@@ -11,9 +12,18 @@ export function roundToNearest(value: number, step: number): number {
   return Math.round(value / step) * step;
 }
 
+// Round a kg value so it converts cleanly to a plate increment in the user's unit.
+// Avoids storing 25 kg (= 55.115 lb) for an lb user — instead stores 24.95 kg (= 55 lb).
+function roundProgressedKg(kg: number, unit: WeightUnit): number {
+  if (unit === "lb") {
+    return lbToKg(roundToPlateIncrement(kgToLb(kg), "lb"));
+  }
+  return roundToPlateIncrement(kg, "kg");
+}
+
 export function incrementKgForUnit(unit: WeightUnit): number {
-  const lbIncrementKg = 5 * 0.45359237;
-  return roundToNearest(unit === "lb" ? lbIncrementKg : 2.5, 0.5);
+  // 5 lb in kg, or 2.5 kg — no internal 0.5-kg rounding (callers plate-round the result)
+  return unit === "lb" ? 5 * 0.45359237 : 2.5;
 }
 
 export function lastDefinedNumber(values: Array<number | undefined>): number | undefined {
@@ -117,11 +127,11 @@ export function computeNextProgressionSuggestion(
     }
     if (typeof nextBaseKg === "number") {
       if (allHitMin) {
-        nextBaseKg = roundToNearest(nextBaseKg + incrementKg, 0.5);
+        nextBaseKg = roundProgressedKg(nextBaseKg + incrementKg, unit);
       } else if (majorityMissed) {
-        nextBaseKg = roundToNearest(Math.max(0, nextBaseKg - incrementKg), 0.5);
+        nextBaseKg = roundProgressedKg(Math.max(0, nextBaseKg - incrementKg), unit);
       } else if (mostHitMin && lastSetMissed) {
-        nextBaseKg = roundToNearest(nextBaseKg, 0.5);
+        nextBaseKg = roundProgressedKg(nextBaseKg, unit);
       }
     }
   } else if (isolation) {
@@ -135,7 +145,7 @@ export function computeNextProgressionSuggestion(
       typeof avgReps === "number" &&
       avgReps >= prev.repRange.max
     ) {
-      nextBaseKg = roundToNearest(nextBaseKg + incrementKg, 0.5);
+      nextBaseKg = roundProgressedKg(nextBaseKg + incrementKg, unit);
     }
   } else if (typeof nextBaseKg !== "number") {
     nextBaseKg = lastDefinedNumber(evaluated.map((s) => s.usedWeightKg));
