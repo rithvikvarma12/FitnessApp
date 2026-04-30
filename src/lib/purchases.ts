@@ -1,9 +1,14 @@
 import { Purchases, LOG_LEVEL } from "@revenuecat/purchases-capacitor";
 import { Capacitor } from "@capacitor/core";
+import { supabase } from "./supabase";
 
 export const ENTITLEMENT_ID = "Pro";
 export const OFFERING_ID = "trainlab_pro";
 const REVENUECAT_APPLE_KEY = "appl_XEYpcIKAbOASwyRQgYMRjnrRBwm";
+
+const REVIEWER_EMAILS = [
+  "appstoretest57@gmail.com",
+];
 
 // Resolves once initPurchases() completes (or immediately on web)
 let _resolvePurchasesReady!: () => void;
@@ -45,6 +50,18 @@ export async function logoutPurchases(): Promise<void> {
 export async function getIsPro(): Promise<boolean> {
   // On web/PWA, purchases are not available — treat as Pro so gates don't fire
   if (!Capacitor.isNativePlatform()) return true;
+
+  // Reviewer bypass — grants Pro to App Store / Google Play reviewers
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const email = session?.user?.email?.toLowerCase();
+    if (email && REVIEWER_EMAILS.includes(email)) {
+      return true;
+    }
+  } catch {
+    // ignore and fall through to RevenueCat
+  }
+
   try {
     const { customerInfo } = await Purchases.getCustomerInfo();
     return ENTITLEMENT_ID in customerInfo.entitlements.active;
