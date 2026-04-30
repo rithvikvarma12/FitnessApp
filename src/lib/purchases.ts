@@ -50,8 +50,12 @@ export async function logoutPurchases(): Promise<void> {
 export interface ProDebugInfo {
   platform: "web" | "native";
   reviewerEmails: string[];
+  userId: string | null;
   rawEmail: string | null;
   normalizedEmail: string | null;
+  userMetadata: Record<string, unknown> | null;
+  appMetadata: Record<string, unknown> | null;
+  identities: unknown[] | null;
   reviewerMatch: boolean;
   revenueCatIsPro: boolean | null;
   sessionError?: string;
@@ -62,8 +66,12 @@ export async function getProStatus(): Promise<{ isPro: boolean; debug: ProDebugI
   const debug: ProDebugInfo = {
     platform: Capacitor.isNativePlatform() ? "native" : "web",
     reviewerEmails: REVIEWER_EMAILS,
+    userId: null,
     rawEmail: null,
     normalizedEmail: null,
+    userMetadata: null,
+    appMetadata: null,
+    identities: null,
     reviewerMatch: false,
     revenueCatIsPro: null,
   };
@@ -76,13 +84,28 @@ export async function getProStatus(): Promise<{ isPro: boolean; debug: ProDebugI
   // Reviewer bypass — grants Pro to App Store / Google Play reviewers
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const rawEmail = session?.user?.email ?? null;
+    const user = session?.user;
+    const rawEmail = user?.email ?? null;
     const normalized = rawEmail?.toLowerCase().trim() ?? null;
+    debug.userId = user?.id ?? null;
     debug.rawEmail = rawEmail;
     debug.normalizedEmail = normalized;
-    debug.reviewerMatch = !!normalized && REVIEWER_EMAILS.includes(normalized);
-    console.log("[getIsPro] session email:", normalized, "reviewer match:", debug.reviewerMatch);
-    if (debug.reviewerMatch) return { isPro: true, debug };
+    debug.userMetadata = (user?.user_metadata as Record<string, unknown> | undefined) ?? null;
+    debug.appMetadata = (user?.app_metadata as Record<string, unknown> | undefined) ?? null;
+    debug.identities = (user?.identities as unknown[] | undefined) ?? null;
+
+    const candidateEmails = [
+      user?.email,
+      (user?.user_metadata as any)?.email,
+      ...((user?.identities ?? []) as any[]).map(i => i?.identity_data?.email),
+    ]
+      .filter(Boolean)
+      .map((e: string) => e.toLowerCase().trim());
+
+    const matched = candidateEmails.some(e => REVIEWER_EMAILS.includes(e));
+    debug.reviewerMatch = matched;
+    console.log("[getIsPro] candidate emails:", candidateEmails, "reviewer match:", matched);
+    if (matched) return { isPro: true, debug };
   } catch (e) {
     debug.sessionError = e instanceof Error ? e.message : String(e);
     console.error("[getIsPro] reviewer-bypass getSession failed:", e);
