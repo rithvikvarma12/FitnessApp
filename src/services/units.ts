@@ -8,26 +8,78 @@ export function lbToKg(lb: number) {
   return lb * KG_PER_LB;
 }
 
-// Round a display weight to the nearest plate-friendly increment.
-// 2.5 lb is the smallest standard plate combo in the US; 1 kg is the
-// smallest commonly-stocked metric increment.
-export function roundToPlateIncrement(displayWeight: number, unit: Unit): number {
-  const increment = unit === "lb" ? 2.5 : 1;
+export type EquipmentType = "barbell" | "dumbbell" | "machine" | "cable" | "bodyweight";
+
+// Equipment-aware rounding: stack-loaded gear (machines, cables) typically
+// jumps in larger increments than free-weight plates.
+export function roundToEquipmentIncrement(
+  displayWeight: number,
+  unit: Unit,
+  equipment: EquipmentType
+): number {
+  let increment: number;
+
+  if (unit === "lb") {
+    switch (equipment) {
+      case "machine":
+      case "cable":
+        increment = 10;
+        break;
+      case "dumbbell":
+        increment = 5;
+        break;
+      case "barbell":
+      default:
+        increment = 5;
+        break;
+    }
+  } else {
+    switch (equipment) {
+      case "machine":
+      case "cable":
+        increment = 5;
+        break;
+      case "dumbbell":
+        increment = 2.5;
+        break;
+      case "barbell":
+      default:
+        increment = 2.5;
+        break;
+    }
+  }
+
   return Math.round(displayWeight / increment) * increment;
+}
+
+// Best-effort classification by exercise name. Falls back to "barbell" when
+// no keyword matches (the most conservative — smallest increment).
+export function inferEquipmentFromName(name: string): EquipmentType {
+  const n = name.toLowerCase();
+  if (n.includes("cable") || n.includes("pressdown") || n.includes("pulldown") || n.includes("crossover")) return "cable";
+  if (n.includes("machine") || n.includes("smith")) return "machine";
+  if (n.includes("dumbbell") || /\bdb\b/.test(n)) return "dumbbell";
+  if (n.includes("pull-up") || n.includes("chin-up") || n.includes("dip") || n.includes("push-up") || n.includes("bodyweight")) return "bodyweight";
+  return "barbell";
 }
 
 export function toDisplay(valueKg: number, unit: Unit) {
   return unit === "kg" ? valueKg : kgToLb(valueKg);
 }
 
-// Plate-rounded display value as a number (for input values).
-export function toDisplayRounded(valueKg: number, unit: Unit): number {
-  return roundToPlateIncrement(toDisplay(valueKg, unit), unit);
+// Plate-rounded display value as a number (for exercise input values).
+export function toDisplayRounded(
+  valueKg: number,
+  unit: Unit,
+  equipment: EquipmentType = "barbell"
+): number {
+  return roundToEquipmentIncrement(toDisplay(valueKg, unit), unit, equipment);
 }
 
-export function formatWeight(valueKg: number, unit: Unit) {
-  const rounded = toDisplayRounded(valueKg, unit);
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+// Body-weight formatter — 1-decimal precision; do NOT plate-round (a scale reads
+// 75.3 kg, not 75 kg).
+export function formatWeight(value: number, unit: Unit) {
+  return unit === "kg" ? value.toFixed(1) : kgToLb(value).toFixed(1);
 }
 
 export function fromDisplay(value: number, unit: Unit) {

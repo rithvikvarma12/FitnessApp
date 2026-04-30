@@ -1,5 +1,5 @@
 import type { PlannedExercise } from "../db/types";
-import { kgToLb, lbToKg, roundToPlateIncrement } from "./units";
+import { kgToLb, lbToKg, roundToEquipmentIncrement, inferEquipmentFromName, type EquipmentType } from "./units";
 
 export type WeightUnit = "kg" | "lb";
 
@@ -12,13 +12,14 @@ export function roundToNearest(value: number, step: number): number {
   return Math.round(value / step) * step;
 }
 
-// Round a kg value so it converts cleanly to a plate increment in the user's unit.
-// Avoids storing 25 kg (= 55.115 lb) for an lb user — instead stores 24.95 kg (= 55 lb).
-function roundProgressedKg(kg: number, unit: WeightUnit): number {
+// Round a kg value so it converts cleanly to an equipment-appropriate plate
+// increment in the user's unit. e.g. for a cable exercise in lb mode, rounds to
+// the nearest 10 lb-clean kg value; for a barbell in kg mode, nearest 2.5 kg.
+function roundProgressedKg(kg: number, unit: WeightUnit, equipment: EquipmentType): number {
   if (unit === "lb") {
-    return lbToKg(roundToPlateIncrement(kgToLb(kg), "lb"));
+    return lbToKg(roundToEquipmentIncrement(kgToLb(kg), "lb", equipment));
   }
-  return roundToPlateIncrement(kg, "kg");
+  return roundToEquipmentIncrement(kg, "kg", equipment);
 }
 
 export function incrementKgForUnit(unit: WeightUnit): number {
@@ -93,6 +94,7 @@ export function computeNextProgressionSuggestion(
 ): ProgressionSuggestion {
   if (!prev) return {};
   const incrementKg = incrementKgForUnit(unit);
+  const equipment = inferEquipmentFromName(exName);
   const baseKg = inferPrevBaseWeightKg(prev);
   const rampOffsetsKg = typeof baseKg === "number" ? getPrevRampedOffsetsKg(prev, baseKg) : undefined;
   if (prev.sets.length === 0) return { baseWeightKg: baseKg, rampOffsetsKg };
@@ -127,11 +129,11 @@ export function computeNextProgressionSuggestion(
     }
     if (typeof nextBaseKg === "number") {
       if (allHitMin) {
-        nextBaseKg = roundProgressedKg(nextBaseKg + incrementKg, unit);
+        nextBaseKg = roundProgressedKg(nextBaseKg + incrementKg, unit, equipment);
       } else if (majorityMissed) {
-        nextBaseKg = roundProgressedKg(Math.max(0, nextBaseKg - incrementKg), unit);
+        nextBaseKg = roundProgressedKg(Math.max(0, nextBaseKg - incrementKg), unit, equipment);
       } else if (mostHitMin && lastSetMissed) {
-        nextBaseKg = roundProgressedKg(nextBaseKg, unit);
+        nextBaseKg = roundProgressedKg(nextBaseKg, unit, equipment);
       }
     }
   } else if (isolation) {
@@ -145,7 +147,7 @@ export function computeNextProgressionSuggestion(
       typeof avgReps === "number" &&
       avgReps >= prev.repRange.max
     ) {
-      nextBaseKg = roundProgressedKg(nextBaseKg + incrementKg, unit);
+      nextBaseKg = roundProgressedKg(nextBaseKg + incrementKg, unit, equipment);
     }
   } else if (typeof nextBaseKg !== "number") {
     nextBaseKg = lastDefinedNumber(evaluated.map((s) => s.usedWeightKg));

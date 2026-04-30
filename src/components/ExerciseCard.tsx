@@ -1,6 +1,7 @@
+import { useRef } from "react";
 import type { PlannedExercise, SetEntry } from "../db/types";
 import type { Unit } from "../services/units";
-import { toDisplayRounded, fromDisplay } from "../services/units";
+import { toDisplayRounded, fromDisplay, inferEquipmentFromName } from "../services/units";
 import RestTimer from "./RestTimer";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
@@ -50,6 +51,21 @@ export default function ExerciseCard({
   onRestTimerDismiss
 }: ExerciseCardProps) {
   const lastActualWeightKg = lastNonEmptyActualWeightKg(ex);
+  const equipment = inferEquipmentFromName(ex.name);
+
+  // Override iOS WKWebView's default "scroll focused input above keyboard"
+  // behavior with centered scroll. Debounced so rapid focus changes between
+  // sets don't cause stacked scroll animations.
+  const focusScrollTimer = useRef<number | null>(null);
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const target = e.currentTarget;
+    if (focusScrollTimer.current !== null) {
+      window.clearTimeout(focusScrollTimer.current);
+    }
+    focusScrollTimer.current = window.setTimeout(() => {
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 300);
+  };
 
   return (
     <div className="workoutExerciseCard">
@@ -108,7 +124,8 @@ export default function ExerciseCard({
             disabled={isLocked}
             inputMode="decimal"
             placeholder={`Base ${unit}`}
-            value={typeof ex.plannedWeightKg === "number" ? toDisplayRounded(ex.plannedWeightKg, unit) : ""}
+            value={typeof ex.plannedWeightKg === "number" ? toDisplayRounded(ex.plannedWeightKg, unit, equipment) : ""}
+            onFocus={handleInputFocus}
             onChange={(e) => {
               const v = e.target.value.trim();
               const num = v === "" ? undefined : Number(v);
@@ -138,9 +155,9 @@ export default function ExerciseCard({
         {ex.sets.map((s) => {
           const plannedWtPlaceholder =
             typeof s.plannedWeightKg === "number"
-              ? String(toDisplayRounded(s.plannedWeightKg, unit))
+              ? String(toDisplayRounded(s.plannedWeightKg, unit, equipment))
               : typeof ex.plannedWeightKg === "number"
-              ? String(toDisplayRounded(ex.plannedWeightKg, unit))
+              ? String(toDisplayRounded(ex.plannedWeightKg, unit, equipment))
               : unit;
           return (
             <div key={s.setNumber} className={`set-grid ${s.completed ? "set-row-done" : ""}`}>
@@ -150,8 +167,9 @@ export default function ExerciseCard({
                 disabled={isLocked}
                 inputMode="decimal"
                 placeholder={plannedWtPlaceholder}
-                value={typeof s.actualWeightKg === "number" ? toDisplayRounded(s.actualWeightKg, unit) : ""}
+                value={typeof s.actualWeightKg === "number" ? toDisplayRounded(s.actualWeightKg, unit, equipment) : ""}
                 className={s.completed ? "input-done" : ""}
+                onFocus={handleInputFocus}
                 onChange={(e) => {
                   const v = e.target.value.trim();
                   const num = v === "" ? undefined : Number(v);
@@ -169,6 +187,7 @@ export default function ExerciseCard({
                 placeholder={`${s.plannedRepsMin}–${s.plannedRepsMax}`}
                 value={s.actualReps ?? ""}
                 className={s.completed ? "input-done" : ""}
+                onFocus={handleInputFocus}
                 onChange={(e) => {
                   const v = e.target.value.trim();
                   const num = v === "" ? undefined : Number(v);
