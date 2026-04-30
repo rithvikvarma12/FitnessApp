@@ -1,6 +1,6 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PlannedExercise, SetEntry } from "../db/types";
-import type { Unit } from "../services/units";
+import type { Unit, EquipmentType } from "../services/units";
 import { toDisplayClean, toDisplayRounded, fromDisplay, inferEquipmentFromName } from "../services/units";
 import RestTimer from "./RestTimer";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -11,6 +11,107 @@ function lastNonEmptyActualWeightKg(ex: PlannedExercise): number | undefined {
     if (typeof w === "number") return w;
   }
   return undefined;
+}
+
+function weightDisplayString(weightKg: number | undefined, unit: Unit): string {
+  return typeof weightKg === "number" ? String(toDisplayClean(weightKg, unit)) : "";
+}
+
+interface SetRowProps {
+  s: SetEntry;
+  unit: Unit;
+  isLocked: boolean;
+  plannedWtPlaceholder: string;
+  onCommitWeightKg: (weightKg: number | undefined) => void;
+  onCommitReps: (reps: number | undefined) => void;
+  onToggleCompleted: () => Promise<void> | void;
+  onInputFocus: (e: React.FocusEvent<HTMLInputElement>) => void;
+}
+
+function SetRow({
+  s,
+  unit,
+  isLocked,
+  plannedWtPlaceholder,
+  onCommitWeightKg,
+  onCommitReps,
+  onToggleCompleted,
+  onInputFocus,
+}: SetRowProps) {
+  const [weightInput, setWeightInput] = useState<string>(weightDisplayString(s.actualWeightKg, unit));
+  const [repsInput, setRepsInput] = useState<string>(s.actualReps !== undefined ? String(s.actualReps) : "");
+
+  // Sync local input strings when the underlying set changes from outside
+  // (e.g. plan regen, "= Last actual" button, unit toggle).
+  useEffect(() => {
+    setWeightInput(weightDisplayString(s.actualWeightKg, unit));
+  }, [s.actualWeightKg, unit]);
+
+  useEffect(() => {
+    setRepsInput(s.actualReps !== undefined ? String(s.actualReps) : "");
+  }, [s.actualReps]);
+
+  const commitWeight = () => {
+    const v = weightInput.trim();
+    if (v === "") {
+      onCommitWeightKg(undefined);
+      return;
+    }
+    const parsed = parseFloat(v);
+    if (!Number.isFinite(parsed)) return;
+    onCommitWeightKg(fromDisplay(parsed, unit));
+  };
+
+  const commitReps = () => {
+    const v = repsInput.trim();
+    if (v === "") {
+      onCommitReps(undefined);
+      return;
+    }
+    const parsed = parseInt(v, 10);
+    if (!Number.isFinite(parsed)) return;
+    onCommitReps(parsed);
+  };
+
+  return (
+    <div className={`set-grid ${s.completed ? "set-row-done" : ""}`}>
+      <div className="set-num">{s.setNumber}</div>
+
+      <input
+        type="text"
+        disabled={isLocked}
+        inputMode="decimal"
+        placeholder={plannedWtPlaceholder}
+        value={weightInput}
+        className={s.completed ? "input-done" : ""}
+        onFocus={onInputFocus}
+        onChange={(e) => setWeightInput(e.target.value)}
+        onBlur={commitWeight}
+      />
+
+      <input
+        type="text"
+        disabled={isLocked}
+        inputMode="numeric"
+        placeholder={`${s.plannedRepsMin}–${s.plannedRepsMax}`}
+        value={repsInput}
+        className={s.completed ? "input-done" : ""}
+        onFocus={onInputFocus}
+        onChange={(e) => setRepsInput(e.target.value)}
+        onBlur={commitReps}
+      />
+
+      <button
+        type="button"
+        className={`set-check-btn ${s.completed ? "done" : ""}`}
+        disabled={isLocked}
+        onClick={() => void onToggleCompleted()}
+        aria-label={s.completed ? "Mark incomplete" : "Mark complete"}
+      >
+        {s.completed ? "✓" : ""}
+      </button>
+    </div>
+  );
 }
 
 interface ExerciseCardProps {
@@ -51,7 +152,7 @@ export default function ExerciseCard({
   onRestTimerDismiss
 }: ExerciseCardProps) {
   const lastActualWeightKg = lastNonEmptyActualWeightKg(ex);
-  const equipment = inferEquipmentFromName(ex.name);
+  const equipment: EquipmentType = inferEquipmentFromName(ex.name);
 
   // Override iOS WKWebView's default "scroll focused input above keyboard"
   // behavior with centered scroll. Debounced so rapid focus changes between
@@ -65,6 +166,24 @@ export default function ExerciseCard({
     focusScrollTimer.current = window.setTimeout(() => {
       target.scrollIntoView({ block: "center", behavior: "smooth" });
     }, 300);
+  };
+
+  // Local string state for the base weight input — preserves typing of
+  // decimals (e.g. "82.5") that a controlled-numeric input would clobber.
+  const [baseInput, setBaseInput] = useState<string>(weightDisplayString(ex.plannedWeightKg, unit));
+  useEffect(() => {
+    setBaseInput(weightDisplayString(ex.plannedWeightKg, unit));
+  }, [ex.plannedWeightKg, unit]);
+
+  const commitBase = () => {
+    const v = baseInput.trim();
+    if (v === "") {
+      onExerciseBasePlanUpdate(dayId, ex.id, undefined);
+      return;
+    }
+    const parsed = parseFloat(v);
+    if (!Number.isFinite(parsed)) return;
+    onExerciseBasePlanUpdate(dayId, ex.id, fromDisplay(parsed, unit));
   };
 
   return (
@@ -121,20 +240,14 @@ export default function ExerciseCard({
 
         <div className="exerciseBaseField">
           <input
+            type="text"
             disabled={isLocked}
             inputMode="decimal"
             placeholder={`Base ${unit}`}
-            value={typeof ex.plannedWeightKg === "number" ? toDisplayClean(ex.plannedWeightKg, unit) : ""}
+            value={baseInput}
             onFocus={handleInputFocus}
-            onChange={(e) => {
-              const v = e.target.value.trim();
-              const num = v === "" ? undefined : Number(v);
-              const kg =
-                num === undefined || !Number.isFinite(num)
-                  ? undefined
-                  : fromDisplay(num, unit);
-              onExerciseBasePlanUpdate(dayId, ex.id, kg);
-            }}
+            onChange={(e) => setBaseInput(e.target.value)}
+            onBlur={commitBase}
           />
           <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.04em" }}>Base wt</div>
         </div>
@@ -160,58 +273,22 @@ export default function ExerciseCard({
               ? String(toDisplayRounded(ex.plannedWeightKg, unit, equipment))
               : unit;
           return (
-            <div key={s.setNumber} className={`set-grid ${s.completed ? "set-row-done" : ""}`}>
-              <div className="set-num">{s.setNumber}</div>
-
-              <input
-                disabled={isLocked}
-                inputMode="decimal"
-                placeholder={plannedWtPlaceholder}
-                value={typeof s.actualWeightKg === "number" ? toDisplayClean(s.actualWeightKg, unit) : ""}
-                className={s.completed ? "input-done" : ""}
-                onFocus={handleInputFocus}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  const num = v === "" ? undefined : Number(v);
-                  const kg =
-                    num === undefined || !Number.isFinite(num)
-                      ? undefined
-                      : fromDisplay(num, unit);
-                  onSetUpdate(dayId, ex.id, s.setNumber, { actualWeightKg: kg });
-                }}
-              />
-
-              <input
-                disabled={isLocked}
-                inputMode="numeric"
-                placeholder={`${s.plannedRepsMin}–${s.plannedRepsMax}`}
-                value={s.actualReps ?? ""}
-                className={s.completed ? "input-done" : ""}
-                onFocus={handleInputFocus}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  const num = v === "" ? undefined : Number(v);
-                  onSetUpdate(dayId, ex.id, s.setNumber, {
-                    actualReps: Number.isFinite(num as number) ? (num as number) : undefined
-                  });
-                }}
-              />
-
-              <button
-                type="button"
-                className={`set-check-btn ${s.completed ? "done" : ""}`}
-                disabled={isLocked}
-                onClick={async () => {
-                  if (!s.completed) {
-                    try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
-                  }
-                  onSetUpdate(dayId, ex.id, s.setNumber, { completed: !s.completed });
-                }}
-                aria-label={s.completed ? "Mark incomplete" : "Mark complete"}
-              >
-                {s.completed ? "✓" : ""}
-              </button>
-            </div>
+            <SetRow
+              key={s.setNumber}
+              s={s}
+              unit={unit}
+              isLocked={isLocked}
+              plannedWtPlaceholder={plannedWtPlaceholder}
+              onInputFocus={handleInputFocus}
+              onCommitWeightKg={(kg) => onSetUpdate(dayId, ex.id, s.setNumber, { actualWeightKg: kg })}
+              onCommitReps={(reps) => onSetUpdate(dayId, ex.id, s.setNumber, { actualReps: reps })}
+              onToggleCompleted={async () => {
+                if (!s.completed) {
+                  try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+                }
+                onSetUpdate(dayId, ex.id, s.setNumber, { completed: !s.completed });
+              }}
+            />
           );
         })}
       </div>
