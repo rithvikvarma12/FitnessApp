@@ -67,6 +67,13 @@ export function toDisplay(valueKg: number, unit: Unit) {
   return unit === "kg" ? valueKg : kgToLb(valueKg);
 }
 
+// Cleans up float-precision artifacts (79.99999999999999 → 80) without
+// plate-rounding. Use for controlled input values where typing must be
+// preserved exactly to the nearest 0.1.
+export function toDisplayClean(valueKg: number, unit: Unit): number {
+  return Math.round(toDisplay(valueKg, unit) * 10) / 10;
+}
+
 // Plate-rounded display value as a number (for exercise input values).
 export function toDisplayRounded(
   valueKg: number,

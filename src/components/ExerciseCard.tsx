@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { PlannedExercise, SetEntry } from "../db/types";
 import type { Unit } from "../services/units";
-import { toDisplayRounded, fromDisplay, inferEquipmentFromName } from "../services/units";
+import { toDisplayClean, toDisplayRounded, fromDisplay, inferEquipmentFromName } from "../services/units";
 import RestTimer from "./RestTimer";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
@@ -124,7 +124,7 @@ export default function ExerciseCard({
             disabled={isLocked}
             inputMode="decimal"
             placeholder={`Base ${unit}`}
-            value={typeof ex.plannedWeightKg === "number" ? toDisplayRounded(ex.plannedWeightKg, unit, equipment) : ""}
+            value={typeof ex.plannedWeightKg === "number" ? toDisplayClean(ex.plannedWeightKg, unit) : ""}
             onFocus={handleInputFocus}
             onChange={(e) => {
               const v = e.target.value.trim();
@@ -167,7 +167,7 @@ export default function ExerciseCard({
                 disabled={isLocked}
                 inputMode="decimal"
                 placeholder={plannedWtPlaceholder}
-                value={typeof s.actualWeightKg === "number" ? toDisplayRounded(s.actualWeightKg, unit, equipment) : ""}
+                value={typeof s.actualWeightKg === "number" ? toDisplayClean(s.actualWeightKg, unit) : ""}
                 className={s.completed ? "input-done" : ""}
                 onFocus={handleInputFocus}
                 onChange={(e) => {
