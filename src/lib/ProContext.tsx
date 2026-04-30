@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
-import { getIsPro } from "./purchases";
+import { getProStatus, type ProDebugInfo } from "./purchases";
 
 interface ProContextValue {
   isPro: boolean;
   loading: boolean;
+  debugInfo: ProDebugInfo | null;
   refresh: () => Promise<void>;
   openPaywall: () => void;
 }
@@ -11,6 +12,7 @@ interface ProContextValue {
 const ProContext = createContext<ProContextValue>({
   isPro: false,
   loading: true,
+  debugInfo: null,
   refresh: async () => {},
   openPaywall: () => {},
 });
@@ -27,10 +29,12 @@ interface ProProviderProps {
 export function ProProvider({ children, onOpenPaywall }: ProProviderProps) {
   const [isPro, setIsPro] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<ProDebugInfo | null>(null);
 
   const refresh = useCallback(async () => {
-    const pro = await getIsPro();
+    const { isPro: pro, debug } = await getProStatus();
     setIsPro(pro);
+    setDebugInfo(debug);
     setLoading(false);
   }, []);
 
@@ -39,7 +43,7 @@ export function ProProvider({ children, onOpenPaywall }: ProProviderProps) {
   }, [refresh]);
 
   return (
-    <ProContext.Provider value={{ isPro, loading, refresh, openPaywall: onOpenPaywall }}>
+    <ProContext.Provider value={{ isPro, loading, debugInfo, refresh, openPaywall: onOpenPaywall }}>
       {children}
     </ProContext.Provider>
   );

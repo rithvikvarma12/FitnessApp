@@ -175,7 +175,7 @@ function InjuryCard({ inj }: { inj: ActiveInjury }) {
 }
 
 export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
-  const { isPro, openPaywall } = useProContext();
+  const { isPro, openPaywall, debugInfo } = useProContext();
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const unit = useLiveQuery(async () => {
     const s = await db.settings.get("unit");
@@ -925,6 +925,22 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
             </div>
             <button style={{ padding: "6px 12px", fontSize: 12 }} onClick={openPaywall}>Upgrade</button>
           </div>
+        )}
+
+        {debugInfo && (
+          <pre style={{
+            marginTop: 10,
+            padding: "8px 10px",
+            borderRadius: 6,
+            background: "var(--bg-subtle)",
+            border: "1px solid var(--border-subtle)",
+            fontSize: 10,
+            color: "var(--text-muted)",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-all",
+          }}>
+            {JSON.stringify(debugInfo, null, 2)}
+          </pre>
         )}
       </div>
 
