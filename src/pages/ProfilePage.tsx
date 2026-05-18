@@ -11,6 +11,7 @@ import { queueOperation } from "../lib/offlineQueue";
 import { useProContext } from "../lib/ProContext";
 import { FREE_FEATURES } from "../lib/featureGate";
 import NutritionSources from "../components/NutritionSources";
+import { ensureSeedData } from "../db/seed";
 
 function syncNutritionSettingsToSupabase(ns: NutritionSettings) {
   try {
@@ -177,6 +178,37 @@ function InjuryCard({ inj }: { inj: ActiveInjury }) {
 
 export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
   const { isPro, openPaywall } = useProContext();
+
+  // Account deletion (Apple Guideline 5.1.1(v))
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteConfirmed = deleteConfirmText.trim().toUpperCase() === "DELETE";
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account");
+      if (error || !data?.success) {
+        const msg = error?.message ?? data?.error ?? "Account deletion failed.";
+        setDeleteError(`${msg} Please try again or contact support.`);
+        setDeleting(false);
+        return;
+      }
+      // Success — wipe every local Dexie table, then restore static seed data
+      // so a subsequent sign-up in the same session isn't left broken.
+      await Promise.all(db.tables.map((t) => t.clear()));
+      await ensureSeedData();
+      // signOut triggers onAuthStateChange → App routes back to AuthPage.
+      await supabase.auth.signOut();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setDeleteError(`${msg} Please try again or contact support.`);
+      setDeleting(false);
+    }
+  };
   const activeUserId = useLiveQuery(async () => getActiveUserId(), [], "");
   const unit = useLiveQuery(async () => {
     const s = await db.settings.get("unit");
@@ -950,6 +982,34 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
         </div>
       )}
 
+      {/* Delete Account (Apple Guideline 5.1.1(v)) */}
+      <div style={{ marginTop: 12 }}>
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteConfirmText("");
+            setDeleteError(null);
+            setShowDeleteModal(true);
+          }}
+          style={{
+            width: "100%",
+            fontSize: 13,
+            fontWeight: 700,
+            background: "rgba(239,68,68,0.1)",
+            color: "#ef4444",
+            border: "1px solid rgba(239,68,68,0.4)",
+            borderRadius: "var(--radius-md)",
+            padding: "11px",
+            cursor: "pointer",
+          }}
+        >
+          Delete Account
+        </button>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 6 }}>
+          Permanently deletes your account and all data.
+        </div>
+      </div>
+
       {/* Custom Exercises */}
       <div style={{
         background: "var(--bg-subtle)",
@@ -1119,6 +1179,87 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
           </>
         )}
       </div>
+
+      {/* Delete Account confirmation modal */}
+      {showDeleteModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 4000,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            className="card"
+            style={{ maxWidth: 380, width: "100%", display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 800, color: "var(--text-primary)" }}>
+              Delete Account?
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              This permanently deletes your account and all data: profile, workout history,
+              weight logs, and nutrition data. This cannot be undone.
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
+                Type DELETE to confirm
+              </div>
+              <input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                disabled={deleting}
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            {deleteError && (
+              <div className="tag tag--red" style={{ padding: "8px 10px", fontSize: 12 }}>
+                {deleteError}
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={deleting || !deleteConfirmed}
+              onClick={() => void handleDeleteAccount()}
+              style={{
+                width: "100%",
+                fontSize: 14,
+                fontWeight: 700,
+                padding: "12px",
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                borderRadius: "var(--radius-md)",
+                opacity: deleting || !deleteConfirmed ? 0.5 : 1,
+                cursor: deleting || !deleteConfirmed ? "not-allowed" : "pointer",
+              }}
+            >
+              {deleting ? "Deleting…" : "Yes, permanently delete my account"}
+            </button>
+
+            <button
+              type="button"
+              className="secondary"
+              disabled={deleting}
+              onClick={() => setShowDeleteModal(false)}
+              style={{ width: "100%", fontSize: 13 }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
