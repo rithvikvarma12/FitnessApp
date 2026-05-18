@@ -17,6 +17,7 @@ import { supabase } from "../lib/supabase";
 import { queueOperation } from "../lib/offlineQueue";
 import type { DailyNutritionLog } from "../db/types";
 import { useProContext } from "../lib/ProContext";
+import NutritionSources from "../components/NutritionSources";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -324,6 +325,9 @@ export default function NutritionPage({ onGoToProfile }: NutritionPageProps) {
           {settings.trackFat && <MacroBar label="Fat" value={log?.fatGrams ?? 0} target={settings.fatGrams} color="#f97316" />}
         </div>
       )}
+
+      {/* Citations for the calorie/macro targets shown above */}
+      <NutritionSources />
 
       {/* Quick log form */}
       <div className="card nutri-log-card">

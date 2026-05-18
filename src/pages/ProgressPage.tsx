@@ -13,6 +13,7 @@ import type {
 } from "../services/progressTracker";
 import PRCelebration from "../components/PRCelebration";
 import MuscleMap from "../components/MuscleMap";
+import NutritionSources from "../components/NutritionSources";
 import { PROGRESS_GROUP_TO_MUSCLES } from "../services/muscleMapping";
 import {
   Chart as ChartJS,
@@ -364,24 +365,27 @@ export default function ProgressPage() {
         const logged = last28.filter((d) => d.calories > 0);
         const avgCalories = logged.length > 0 ? Math.round(logged.reduce((s, d) => s + d.calories, 0) / logged.length) : 0;
         return (
-          <div className="card nutri-adherence-card">
-            <div className="progress-section-title">Nutrition Adherence</div>
-            <div className="row" style={{ gap: 10, marginBottom: 12 }}>
-              <div className="stat-box"><div className="stat-box-label">This Week On Target</div><div className="stat-box-value">{daysOnTarget}/7</div></div>
-              <div className="stat-box"><div className="stat-box-label">4-Week Avg Calories</div><div className="stat-box-value">{avgCalories || "—"}</div></div>
-              <div className="stat-box"><div className="stat-box-label">Adherence</div><div className="stat-box-value">{Math.round((daysOnTarget / 7) * 100)}%</div></div>
+          <>
+            <div className="card nutri-adherence-card">
+              <div className="progress-section-title">Nutrition Adherence</div>
+              <div className="row" style={{ gap: 10, marginBottom: 12 }}>
+                <div className="stat-box"><div className="stat-box-label">This Week On Target</div><div className="stat-box-value">{daysOnTarget}/7</div></div>
+                <div className="stat-box"><div className="stat-box-label">4-Week Avg Calories</div><div className="stat-box-value">{avgCalories || "—"}</div></div>
+                <div className="stat-box"><div className="stat-box-label">Adherence</div><div className="stat-box-value">{Math.round((daysOnTarget / 7) * 100)}%</div></div>
+              </div>
+              <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 40 }}>
+                {last28.slice(-14).map((d) => {
+                  const pct = target > 0 ? Math.min(d.calories / target, 1.3) : 0;
+                  const color = d.onTarget ? "#10b981" : d.calories > 0 ? "#3b82f6" : "var(--border-subtle)";
+                  return (
+                    <div key={d.dateISO} title={`${d.dateISO}: ${d.calories} kcal`} style={{ flex: 1, height: `${Math.max(pct * 100, 4)}%`, background: color, borderRadius: 2, minHeight: 2 }} />
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>Last 14 days vs target</div>
             </div>
-            <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 40 }}>
-              {last28.slice(-14).map((d) => {
-                const pct = target > 0 ? Math.min(d.calories / target, 1.3) : 0;
-                const color = d.onTarget ? "#10b981" : d.calories > 0 ? "#3b82f6" : "var(--border-subtle)";
-                return (
-                  <div key={d.dateISO} title={`${d.dateISO}: ${d.calories} kcal`} style={{ flex: 1, height: `${Math.max(pct * 100, 4)}%`, background: color, borderRadius: 2, minHeight: 2 }} />
-                );
-              })}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>Last 14 days vs target</div>
-          </div>
+            <NutritionSources />
+          </>
         );
       })()}
 

@@ -6,6 +6,7 @@ import { createFirstWeekIfMissing } from "../services/planGenerator";
 import { deriveAutoCardio, defaultCardioTypeForGoal } from "../services/cardio";
 import { fromDisplay, toDisplay } from "../services/units";
 import { generateNutritionSettings, defaultActivityMultiplier } from "../services/nutritionCalculator";
+import NutritionSources from "../components/NutritionSources";
 import { supabase } from "../lib/supabase";
 
 
@@ -620,31 +621,34 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
         const ns = generateNutritionSettings(fakeProfile, wKg);
         if (!ns) return null;
         return (
-          <div style={{
-            background: "rgba(59,130,246,0.06)",
-            border: "1px solid rgba(59,130,246,0.18)",
-            borderLeft: "2px solid var(--accent-blue)",
-            borderRadius: "var(--radius-md)",
-            padding: "12px 14px",
-            marginTop: 8
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--accent-blue)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-              Your Plan
+          <>
+            <div style={{
+              background: "rgba(59,130,246,0.06)",
+              border: "1px solid rgba(59,130,246,0.18)",
+              borderLeft: "2px solid var(--accent-blue)",
+              borderRadius: "var(--radius-md)",
+              padding: "12px 14px",
+              marginTop: 8
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--accent-blue)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                Your Plan
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.6 }}>
+                <strong>{form.daysPerWeek} days/week</strong> training &nbsp;·&nbsp;
+                <strong>{ns.calorieTarget.toLocaleString()} kcal/day</strong>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
+                Protein <strong style={{ color: "var(--text-primary)" }}>{ns.proteinGrams}g</strong>
+                &nbsp;·&nbsp;
+                Carbs <strong style={{ color: "var(--text-primary)" }}>{ns.carbsGrams}g</strong>
+                &nbsp;·&nbsp;
+                Fat <strong style={{ color: "var(--text-primary)" }}>{ns.fatGrams}g</strong>
+                &nbsp;·&nbsp;
+                <span style={{ color: "var(--text-muted)" }}>TDEE {ns.calculatedTDEE?.toLocaleString()} kcal</span>
+              </div>
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.6 }}>
-              <strong>{form.daysPerWeek} days/week</strong> training &nbsp;·&nbsp;
-              <strong>{ns.calorieTarget.toLocaleString()} kcal/day</strong>
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
-              Protein <strong style={{ color: "var(--text-primary)" }}>{ns.proteinGrams}g</strong>
-              &nbsp;·&nbsp;
-              Carbs <strong style={{ color: "var(--text-primary)" }}>{ns.carbsGrams}g</strong>
-              &nbsp;·&nbsp;
-              Fat <strong style={{ color: "var(--text-primary)" }}>{ns.fatGrams}g</strong>
-              &nbsp;·&nbsp;
-              <span style={{ color: "var(--text-muted)" }}>TDEE {ns.calculatedTDEE?.toLocaleString()} kcal</span>
-            </div>
-          </div>
+            <NutritionSources />
+          </>
         );
       })()}
 

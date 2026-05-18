@@ -10,6 +10,7 @@ import { supabase } from "../lib/supabase";
 import { queueOperation } from "../lib/offlineQueue";
 import { useProContext } from "../lib/ProContext";
 import { FREE_FEATURES } from "../lib/featureGate";
+import NutritionSources from "../components/NutritionSources";
 
 function syncNutritionSettingsToSupabase(ns: NutritionSettings) {
   try {
@@ -901,6 +902,9 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
             {nutritionMsg && (
               <div style={{ marginTop: 6, fontSize: 12, color: nutritionMsg.includes("Enter") ? "#f97316" : "#10b981" }}>{nutritionMsg}</div>
             )}
+
+            {/* Citations for the TDEE / calorie / macro figures above */}
+            <NutritionSources />
           </div>
         )}
       </div>

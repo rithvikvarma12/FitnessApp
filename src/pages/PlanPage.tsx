@@ -14,6 +14,7 @@ import WeekView from "./WeekView";
 import { initRithvikPresetWeek6 } from "../services/presets";
 import NoteChips from "../components/NoteChips";
 import GoalReachedBanner from "../components/GoalReachedBanner";
+import NutritionSources from "../components/NutritionSources";
 import { weeklyTrendFromWindow } from "../services/stats";
 import { deriveAutoCardio } from "../services/cardio";
 import { supabase } from "../lib/supabase";
@@ -458,26 +459,29 @@ export default function PlanPage() {
 
       {/* Nutrition summary card */}
       {nutritionSettings?.enabled && (
-        <div className="nutri-plan-card">
-          <div className="nutri-plan-label">Calories today</div>
-          <div className="nutri-plan-numbers">
-            <span className="nutri-plan-current">{todayNutritionLog?.calories ?? 0}</span>
-            <span className="nutri-plan-sep"> / </span>
-            <span className="nutri-plan-target">{nutritionSettings.calorieTarget} kcal</span>
+        <>
+          <div className="nutri-plan-card">
+            <div className="nutri-plan-label">Calories today</div>
+            <div className="nutri-plan-numbers">
+              <span className="nutri-plan-current">{todayNutritionLog?.calories ?? 0}</span>
+              <span className="nutri-plan-sep"> / </span>
+              <span className="nutri-plan-target">{nutritionSettings.calorieTarget} kcal</span>
+            </div>
+            <div className="nutri-plan-bar-track">
+              <div
+                className="nutri-plan-bar-fill"
+                style={{
+                  width: `${Math.min(((todayNutritionLog?.calories ?? 0) / nutritionSettings.calorieTarget) * 100, 100)}%`,
+                  background: (() => {
+                    const pct = (todayNutritionLog?.calories ?? 0) / nutritionSettings.calorieTarget;
+                    return pct >= 0.9 && pct <= 1.1 ? "#10b981" : pct > 1.1 ? "#f97316" : "#3b82f6";
+                  })(),
+                }}
+              />
+            </div>
           </div>
-          <div className="nutri-plan-bar-track">
-            <div
-              className="nutri-plan-bar-fill"
-              style={{
-                width: `${Math.min(((todayNutritionLog?.calories ?? 0) / nutritionSettings.calorieTarget) * 100, 100)}%`,
-                background: (() => {
-                  const pct = (todayNutritionLog?.calories ?? 0) / nutritionSettings.calorieTarget;
-                  return pct >= 0.9 && pct <= 1.1 ? "#10b981" : pct > 1.1 ? "#f97316" : "#3b82f6";
-                })(),
-              }}
-            />
-          </div>
-        </div>
+          <NutritionSources />
+        </>
       )}
 
       {selected && cardioSummary && (
