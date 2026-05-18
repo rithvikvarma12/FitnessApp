@@ -4,6 +4,7 @@ export type RepRange = { min: number; max: number };
 
 export type UserProfile = {
   id: UUID;
+  authId?: string; // Supabase auth user id this profile belongs to; undefined = never synced
   name?: string;
   unit: "kg" | "lb";
   daysPerWeek: 3 | 4 | 5;

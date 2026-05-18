@@ -223,12 +223,17 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
         setDeleting(false);
         return;
       }
-      // Success — wipe every local Dexie table, then restore static seed data
-      // so a subsequent sign-up in the same session isn't left broken.
-      await Promise.all(db.tables.map((t) => t.clear()));
-      await ensureSeedData();
-      // signOut triggers onAuthStateChange → App routes back to AuthPage.
+      // Success. Sign out FIRST so the app routes to AuthPage and the session
+      // effect can't run the profile-recovery path against half-wiped data.
       await supabase.auth.signOut();
+      // Bulletproof wipe — drop the entire IndexedDB database and reopen it
+      // empty. Per-table clear() can partially fail and leave stale profile
+      // rows that the recovery path would later resurrect.
+      db.close();
+      await db.delete();
+      await db.open();
+      // Restore the static exercise catalog for a future sign-up.
+      await ensureSeedData();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setDeleteError(`${msg} Please try again or contact support.`);

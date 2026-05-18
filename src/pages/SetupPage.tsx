@@ -176,6 +176,9 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
           // by the account-deletion Edge Function. Skip; it re-syncs once signed in.
           console.error("SetupPage: no auth session — skipping Supabase profile sync to avoid NULL auth_id");
         } else {
+          // Record the owning auth id locally so the recovery path can later
+          // tell this profile apart from another account's orphaned data.
+          await db.userProfiles.update(profile.id, { authId });
           const { error: profileUpsertErr } = await supabase.from("user_profiles").upsert({
             id: profile.id,
             auth_id: authId,

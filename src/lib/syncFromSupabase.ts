@@ -24,6 +24,7 @@ export async function syncFromSupabase(supabaseProfileId: string): Promise<void>
     if (profileRows?.length) {
       await db.userProfiles.bulkPut(profileRows.map((r: any) => ({
         id: r.id,
+        authId: r.auth_id ?? undefined,
         name: r.name ?? undefined,
         unit: r.unit,
         daysPerWeek: r.days_per_week,

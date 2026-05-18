@@ -146,11 +146,17 @@ export default function App() {
           await loginPurchases(data.id as string);
           setSupabaseProfile(data);
         } else {
-          // No Supabase profile found — check if there's a local profile we can recover
+          // No Supabase profile found. Consider recovering a local profile —
+          // but ONLY if it isn't an orphan left behind by a different account.
+          //   local.authId undefined/empty → never synced (genuine fresh local
+          //     data, or pre-existing) → safe to recover.
+          //   local.authId === this session → same user reinstalling → safe.
+          //   local.authId === a different user → deleted-account orphan → skip.
           const localProfiles = await db.userProfiles.toArray();
-          if (localProfiles.length > 0) {
-            // Recover: upsert the local profile to Supabase with the current auth_id
-            const local = localProfiles[0];
+          const local = localProfiles[0];
+          const ownedByAnotherAccount = !!local?.authId && local.authId !== session.user.id;
+          if (local && !ownedByAnotherAccount) {
+            // Recover: re-link this local profile to the current auth user.
             const { error: upsertErr } = await supabase.from("user_profiles").upsert({
               id: local.id,
               auth_id: session.user.id,
@@ -177,10 +183,14 @@ export default function App() {
               console.error('Profile recovery upsert failed:', upsertErr);
               setSupabaseProfile(null);
             } else {
+              await db.userProfiles.update(local.id, { authId: session.user.id });
               await db.settings.put({ key: "activeUserId", value: local.id });
               setSupabaseProfile(local as unknown as Record<string, unknown>);
             }
           } else {
+            if (ownedByAnotherAccount) {
+              console.warn('Profile recovery skipped — local profile belongs to a different (deleted) account.');
+            }
             setSupabaseProfile(null);
           }
         }
