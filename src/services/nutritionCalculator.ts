@@ -33,25 +33,32 @@ export function caloricTarget(
   goalMode: "cut" | "maintain" | "bulk",
   gender: "male" | "female"
 ): number {
+  let target: number;
   if (goalMode === "cut") {
-    const deficit = gender === "female" ? 400 : 500;
+    // 18% deficit from TDEE — scales with body size, stays in the
+    // evidence-based moderate range (~0.5–1% bodyweight/week). Absolute
+    // calorie floors remain as a safety minimum.
     const minimum = gender === "female" ? 1200 : 1500;
-    return Math.max(minimum, tdee - deficit);
+    target = Math.max(minimum, tdee * 0.82);
+  } else if (goalMode === "bulk") {
+    target = tdee * 1.10; // 10% surplus — lean-bulk
+  } else {
+    target = tdee;
   }
-  if (goalMode === "bulk") return tdee + (gender === "female" ? 200 : 300);
-  return tdee;
+  return Math.round(target / 10) * 10; // round to nearest 10 for cleaner numbers
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 function proteinRateGPerKg(goalMode: "cut" | "maintain" | "bulk", gender: "male" | "female"): number {
   if (gender === "male") {
-    if (goalMode === "cut")  return 2.3;
+    if (goalMode === "cut")  return 2.2;
     if (goalMode === "bulk") return 1.8;
     return 2.0;
   }
   if (goalMode === "cut") return 2.0;
-  return 1.6; // female maintain or bulk
+  if (goalMode === "bulk") return 1.8;
+  return 1.6; // female maintain
 }
 
 function carbFatRatio(
