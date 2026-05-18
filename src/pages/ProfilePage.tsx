@@ -35,7 +35,16 @@ function syncNutritionSettingsToSupabase(ns: NutritionSettings) {
 async function syncUserProfileToSupabase(p: import("../db/types").UserProfile) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    supabase.from("user_profiles").upsert({
+    const authId = session?.user?.id;
+    if (!authId) {
+      // Never write a profile row with a NULL auth_id — the account-deletion
+      // Edge Function resolves data by auth_id, so a NULL would orphan it.
+      console.error("syncUserProfileToSupabase: no auth session — skipping profile sync to avoid NULL auth_id");
+      return;
+    }
+    // Single payload — used for both the direct upsert and the offline-queue
+    // fallback, so auth_id can never be dropped from the retried write.
+    const payload = {
       id: p.id,
       name: p.name ?? null,
       unit: p.unit,
@@ -55,8 +64,14 @@ async function syncUserProfileToSupabase(p: import("../db/types").UserProfile) {
       gender: p.gender ?? null,
       activity_multiplier: p.activityMultiplier ?? null,
       created_at: p.createdAtISO,
-      auth_id: session?.user?.id,
-    }).then(({ error }) => { if (error) { console.error("Supabase user_profiles sync error:", error); void queueOperation("user_profiles", "upsert", { id: p.id, name: p.name ?? null, unit: p.unit, days_per_week: p.daysPerWeek, goal_mode: p.goalMode, current_weight_kg: p.currentWeightKg ?? null, target_weight_kg: p.targetWeightKg ?? null, experience: p.experience, equipment: p.equipment, cardio_goal_auto: p.cardioGoalAuto, cardio_type: p.cardioType, cardio_sessions_per_week: p.cardioSessionsPerWeek, cardio_minutes_per_session: p.cardioMinutesPerSession, notes: p.notes ?? null, height_cm: p.heightCm ?? null, age: p.age ?? null, gender: p.gender ?? null, activity_multiplier: p.activityMultiplier ?? null, created_at: p.createdAtISO }); } });
+      auth_id: authId,
+    };
+    supabase.from("user_profiles").upsert(payload).then(({ error }) => {
+      if (error) {
+        console.error("Supabase user_profiles sync error:", error);
+        void queueOperation("user_profiles", "upsert", payload);
+      }
+    });
   } catch { /* ignore */ }
 }
 type GoalMode = "cut" | "maintain" | "bulk";
@@ -190,7 +205,18 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("delete-account");
+      // Send every known local profile id so the function can delete data
+      // even for profiles whose server-side auth_id link is broken/NULL.
+      const localProfiles = await db.userProfiles.toArray();
+      const profileIds = Array.from(
+        new Set([
+          ...localProfiles.map((p) => p.id),
+          ...(activeUserId ? [activeUserId] : []),
+        ]),
+      );
+      const { data, error } = await supabase.functions.invoke("delete-account", {
+        body: { profileIds },
+      });
       if (error || !data?.success) {
         const msg = error?.message ?? data?.error ?? "Account deletion failed.";
         setDeleteError(`${msg} Please try again or contact support.`);

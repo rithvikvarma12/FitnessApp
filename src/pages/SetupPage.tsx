@@ -170,35 +170,42 @@ export default function SetupPage({ onDone, supabaseProfileId }: SetupPageProps 
       // Upsert full profile to Supabase now that setup is complete
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        const { error: profileUpsertErr } = await supabase.from("user_profiles").upsert({
-          id: profile.id,
-          auth_id: session?.user?.id,
-          name: profile.name ?? null,
-          unit: profile.unit,
-          days_per_week: profile.daysPerWeek,
-          goal_mode: profile.goalMode,
-          current_weight_kg: profile.currentWeightKg ?? null,
-          target_weight_kg: profile.targetWeightKg ?? null,
-          experience: profile.experience,
-          equipment: profile.equipment,
-          cardio_goal_auto: profile.cardioGoalAuto,
-          cardio_type: profile.cardioType,
-          cardio_sessions_per_week: profile.cardioSessionsPerWeek,
-          cardio_minutes_per_session: profile.cardioMinutesPerSession,
-          notes: profile.notes ?? null,
-          height_cm: profile.heightCm ?? null,
-          age: profile.age ?? null,
-          gender: profile.gender ?? null,
-          activity_multiplier: profile.activityMultiplier ?? null,
-          created_at: profile.createdAtISO,
-        });
-        if (profileUpsertErr) {
-          if (profileUpsertErr.code === "23505") {
-            // unique constraint on auth_id — this account already has a profile
-            await db.userProfiles.delete(profile.id);
-            throw new Error("Each account supports one profile. Go to Profile settings to update your existing profile.");
+        const authId = session?.user?.id;
+        if (!authId) {
+          // Never write a profile with a NULL auth_id — it would be unrecoverable
+          // by the account-deletion Edge Function. Skip; it re-syncs once signed in.
+          console.error("SetupPage: no auth session — skipping Supabase profile sync to avoid NULL auth_id");
+        } else {
+          const { error: profileUpsertErr } = await supabase.from("user_profiles").upsert({
+            id: profile.id,
+            auth_id: authId,
+            name: profile.name ?? null,
+            unit: profile.unit,
+            days_per_week: profile.daysPerWeek,
+            goal_mode: profile.goalMode,
+            current_weight_kg: profile.currentWeightKg ?? null,
+            target_weight_kg: profile.targetWeightKg ?? null,
+            experience: profile.experience,
+            equipment: profile.equipment,
+            cardio_goal_auto: profile.cardioGoalAuto,
+            cardio_type: profile.cardioType,
+            cardio_sessions_per_week: profile.cardioSessionsPerWeek,
+            cardio_minutes_per_session: profile.cardioMinutesPerSession,
+            notes: profile.notes ?? null,
+            height_cm: profile.heightCm ?? null,
+            age: profile.age ?? null,
+            gender: profile.gender ?? null,
+            activity_multiplier: profile.activityMultiplier ?? null,
+            created_at: profile.createdAtISO,
+          });
+          if (profileUpsertErr) {
+            if (profileUpsertErr.code === "23505") {
+              // unique constraint on auth_id — this account already has a profile
+              await db.userProfiles.delete(profile.id);
+              throw new Error("Each account supports one profile. Go to Profile settings to update your existing profile.");
+            }
+            console.error("Supabase profile upsert error:", profileUpsertErr);
           }
-          console.error("Supabase profile upsert error:", profileUpsertErr);
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "";
