@@ -201,6 +201,22 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteConfirmed = deleteConfirmText.trim().toUpperCase() === "DELETE";
 
+  // Log out — non-blocking modal (matches Delete Account pattern, avoids
+  // window.confirm() inconsistencies between iOS WebView and Android).
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await onLogOut?.();
+      // Component will unmount when App routes to AuthPage; no further state changes.
+    } catch (e) {
+      console.error("Logout failed:", e);
+      setLoggingOut(false);
+      setShowLogoutModal(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     setDeleting(true);
     setDeleteError(null);
@@ -1003,12 +1019,9 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
             type="button"
             className="secondary"
             style={{ color: "#ef4444", borderColor: "rgba(239,68,68,0.4)", width: "100%", fontSize: 13 }}
-            onClick={() => {
-              const ok = window.confirm("Switch profile? Your data is saved locally.");
-              if (ok) onLogOut();
-            }}
+            onClick={() => setShowLogoutModal(true)}
           >
-            Log Out / Switch Profile
+            Log Out
           </button>
         </div>
       )}
@@ -1210,6 +1223,64 @@ export default function ProfilePage({ onLogOut }: ProfilePageProps = {}) {
           </>
         )}
       </div>
+
+      {/* Log Out confirmation modal */}
+      {showLogoutModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 4000,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            className="card"
+            style={{ maxWidth: 380, width: "100%", display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 800, color: "var(--text-primary)" }}>
+              Log out?
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              You'll return to the login screen. Your data stays safe in your account and will be there when you sign back in.
+            </div>
+
+            <button
+              type="button"
+              disabled={loggingOut}
+              onClick={() => void handleLogout()}
+              style={{
+                width: "100%",
+                fontSize: 14,
+                fontWeight: 700,
+                padding: "12px",
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                borderRadius: "var(--radius-md)",
+                opacity: loggingOut ? 0.5 : 1,
+                cursor: loggingOut ? "not-allowed" : "pointer",
+              }}
+            >
+              {loggingOut ? "Logging out…" : "Log Out"}
+            </button>
+
+            <button
+              type="button"
+              className="secondary"
+              disabled={loggingOut}
+              onClick={() => setShowLogoutModal(false)}
+              style={{ width: "100%", fontSize: 13 }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Delete Account confirmation modal */}
       {showDeleteModal && (

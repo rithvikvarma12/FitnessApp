@@ -146,16 +146,16 @@ export default function App() {
           await loginPurchases(data.id as string);
           setSupabaseProfile(data);
         } else {
-          // No Supabase profile found. Consider recovering a local profile —
-          // but ONLY if it isn't an orphan left behind by a different account.
-          //   local.authId undefined/empty → never synced (genuine fresh local
-          //     data, or pre-existing) → safe to recover.
-          //   local.authId === this session → same user reinstalling → safe.
-          //   local.authId === a different user → deleted-account orphan → skip.
+          // No Supabase profile found. Recover a local profile ONLY when its
+          // authId explicitly matches this session. Any other state — undefined
+          // authId (pre-fix data, partial signup) or foreign authId (deleted
+          // account orphan) — is treated as junk and forces fresh onboarding.
           const localProfiles = await db.userProfiles.toArray();
-          const local = localProfiles[0];
-          const ownedByAnotherAccount = !!local?.authId && local.authId !== session.user.id;
-          if (local && !ownedByAnotherAccount) {
+          // With multi-profile-per-account removed, Dexie holds 0 or 1 row in
+          // the normal case. Legacy multi-profile installs might still have
+          // more — pick the one that matches this session, or none.
+          const local = localProfiles.find((p) => p.authId === session.user.id);
+          if (local) {
             // Recover: re-link this local profile to the current auth user.
             const { error: upsertErr } = await supabase.from("user_profiles").upsert({
               id: local.id,
@@ -188,8 +188,8 @@ export default function App() {
               setSupabaseProfile(local as unknown as Record<string, unknown>);
             }
           } else {
-            if (ownedByAnotherAccount) {
-              console.warn('Profile recovery skipped — local profile belongs to a different (deleted) account.');
+            if (localProfiles.length > 0) {
+              console.warn('Profile recovery skipped — no local profile matches this auth user.');
             }
             setSupabaseProfile(null);
           }
@@ -254,16 +254,13 @@ export default function App() {
           <div className="ambient-blob ambient-blob--purple" />
         </div>
         <WelcomePage
-          profiles={profiles ?? []}
-          onSelectProfile={async (id) => {
-            await db.settings.put({ key: "activeUserId", value: id });
-            const profile = await db.userProfiles.get(id);
-            if (profile) await db.settings.put({ key: "unit", value: profile.unit });
-          }}
           onCreateNew={() => setShowSetup(true)}
           onSignOut={async () => {
             await signOut();
-            await db.settings.delete("activeUserId");
+            db.close();
+            await db.delete();
+            await db.open();
+            await ensureSeedData();
           }}
         />
       </>
@@ -343,7 +340,13 @@ export default function App() {
 
         {/* Page content */}
         <div key={tab} className="tab-content">
-          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : tab === "nutrition" ? <NutritionPage onGoToProfile={() => setTab("profile")} /> : <ProfilePage onLogOut={async () => { await db.settings.delete("activeUserId"); setTab("plan"); }} />}
+          {tab === "plan" ? <PlanPage /> : tab === "weight" ? <WeightPage /> : tab === "progress" ? <ProgressPage /> : tab === "nutrition" ? <NutritionPage onGoToProfile={() => setTab("profile")} /> : <ProfilePage onLogOut={async () => {
+              await signOut();
+              db.close();
+              await db.delete();
+              await db.open();
+              await ensureSeedData();
+            }} />}
         </div>
       </div>
 

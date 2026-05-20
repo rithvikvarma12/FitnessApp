@@ -45,6 +45,11 @@ export async function logoutPurchases(): Promise<void> {
   try {
     await Purchases.logOut();
   } catch (e) {
+    // RevenueCat throws "Called logOut but the current user is anonymous" when
+    // the user was never logged in (no in-app purchase, no loginPurchases call).
+    // Harmless during normal sign-out/account-delete flows — ignore quietly.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.toLowerCase().includes("anonymous")) return;
     console.error("RevenueCat logout failed:", e);
   }
 }
