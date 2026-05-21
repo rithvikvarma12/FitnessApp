@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<!--
+  TrainLab account deletion page (Google Play Guideline 4.8 / Apple Guideline 5.1.1(v))
+  Served by Vercel at https://fitness-app-jet-nine.vercel.app/delete-account.html
+
+  ⚠ REQUIRED — after deploying, whitelist this URL in:
+       Supabase Dashboard → Authentication → URL Configuration → Redirect URLs
+         https://fitness-app-jet-nine.vercel.app/delete-account.html
+
+  Without this whitelist entry, the magic-link redirect fails silently and
+  the page never receives an auth session.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#060A26" />
+  <title>Delete your TrainLab account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #060A26;
+      --bg-surface: #0E1338;
+      --bg-subtle: #131845;
+      --text-primary: #E5E9FB;
+      --text-secondary: #B5BBE0;
+      --text-muted: #7B8BA5;
+      --border-glass: rgba(255,255,255,0.08);
+      --accent-blue: #3b82f6;
+      --accent-purple: #a78bfa;
+      --destructive: #ef4444;
+      --radius-md: 12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    body { display: flex; align-items: center; justify-content: center; padding: 24px 16px 48px; }
+    .root { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    .brand {
+      font-size: 36px; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1;
+    }
+    .title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; text-align: center; }
+    .subtitle { font-size: 14px; color: var(--text-secondary); font-weight: 500; margin: 0; text-align: center; line-height: 1.5; }
+    .card {
+      width: 100%; background: var(--bg-surface);
+      border: 1px solid var(--border-glass); border-radius: var(--radius-md);
+      padding: 22px 20px; display: flex; flex-direction: column; gap: 14px;
+    }
+    label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    input[type=email] {
+      width: 100%; padding: 12px 14px; font-size: 15px; font-family: inherit;
+      background: var(--bg-subtle); color: var(--text-primary);
+      border: 1px solid var(--border-glass); border-radius: var(--radius-md);
+      outline: none; transition: border-color 0.15s;
+    }
+    input[type=email]:focus { border-color: var(--accent-blue); }
+    button { font-family: inherit; cursor: pointer; border-radius: var(--radius-md); transition: opacity 0.15s; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary {
+      width: 100%; padding: 13px; font-size: 14px; font-weight: 700;
+      background: var(--accent-blue); color: #fff; border: none;
+      box-shadow: 0 0 20px rgba(59,130,246,0.3);
+    }
+    button.destructive {
+      width: 100%; padding: 13px; font-size: 14px; font-weight: 700;
+      background: var(--destructive); color: #fff; border: none;
+    }
+    button.secondary {
+      width: 100%; padding: 11px; font-size: 13px; font-weight: 600;
+      background: transparent; color: var(--text-secondary);
+      border: 1px solid var(--border-glass);
+    }
+    .info-box { padding: 12px 14px; border-radius: var(--radius-md); font-size: 13px; line-height: 1.55; }
+    .info-box.warning { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--text-primary); }
+    .info-box.info { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); color: var(--text-primary); }
+    .info-box.success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); color: var(--text-primary); }
+    .error {
+      font-size: 12px; color: #fca5a5; padding: 9px 12px;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25);
+      border-radius: var(--radius-md); line-height: 1.5;
+    }
+    .meta { font-size: 13px; color: var(--text-secondary); margin: 0; line-height: 1.5; }
+    .meta strong { color: var(--text-primary); }
+  </style>
+</head>
+<body>
+  <div class="root" id="root"></div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const SUPABASE_URL = 'https://kelsupblazafjzwzsqzb.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_SoFSkEJztCpDGkthwYawrA_0MxYzYhW';
+
+    // Implicit flow (no flowType: 'pkce') so the magic link works cross-device —
+    // a reviewer may request deletion on one device and open the link on another.
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        detectSessionInUrl: true,
+        persistSession: true,
+        autoRefreshToken: false,
+      },
+    });
+
+    const root = document.getElementById('root');
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const header = () => `
+      <div class="brand">TrainLab</div>
+      <h1 class="title">Delete your TrainLab account</h1>
+      <p class="subtitle">Permanently delete your account and all associated data.</p>
+    `;
+    const footer = () => `
+      <p style="font-size: 12px; color: var(--text-muted); text-align: center; margin: 0; line-height: 1.5;">
+        Need help? Email <a href="mailto:trainlabsupport@gmail.com" style="color: var(--text-muted); text-decoration: underline;">trainlabsupport@gmail.com</a>
+      </p>
+    `;
+
+    // ── State renders ──
+
+    function renderInitial(errorMsg) {
+      root.innerHTML = `
+        ${header()}
+        <form class="card" id="email-form">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label for="email">Email address</label>
+            <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com" />
+          </div>
+          <p class="meta">We'll email you a verification link. Click it to continue with deletion.</p>
+          ${errorMsg ? `<div class="error">${esc(errorMsg)}</div>` : ''}
+          <button type="submit" class="primary" id="email-submit">Send verification email</button>
+        </form>
+        ${footer()}
+      `;
+      document.getElementById('email-form').addEventListener('submit', onSubmitEmail);
+    }
+
+    function renderEmailSent(email) {
+      root.innerHTML = `
+        ${header()}
+        <div class="card">
+          <div class="info-box info">
+            We sent a verification link to <strong>${esc(email)}</strong>. Open the email and click the link to continue. Check your spam folder if it doesn't arrive within a minute.
+          </div>
+          <button class="secondary" id="use-different">Use a different email</button>
+        </div>
+        ${footer()}
+      `;
+      document.getElementById('use-different').addEventListener('click', () => renderInitial(null));
+    }
+
+    function renderConfirm(email) {
+      root.innerHTML = `
+        ${header()}
+        <div class="card">
+          <p class="meta">You're about to delete the account for <strong>${esc(email)}</strong>.</p>
+          <div class="info-box warning">
+            This will permanently delete your TrainLab account, including all workout history, weight logs, nutrition data, and custom exercises. This action cannot be undone.
+          </div>
+          <button class="destructive" id="confirm-delete">Permanently delete account</button>
+          <button class="secondary" id="cancel">Cancel</button>
+        </div>
+        ${footer()}
+      `;
+      document.getElementById('confirm-delete').addEventListener('click', onConfirmDelete);
+      document.getElementById('cancel').addEventListener('click', onCancel);
+    }
+
+    function renderDeleting() {
+      root.innerHTML = `
+        ${header()}
+        <div class="card"><div class="info-box info">Deleting your account…</div></div>
+        ${footer()}
+      `;
+    }
+
+    function renderDeleted() {
+      root.innerHTML = `
+        ${header()}
+        <div class="card">
+          <div class="info-box success">
+            <strong>Your TrainLab account has been deleted.</strong><br>
+            We're sorry to see you go.
+          </div>
+        </div>
+        ${footer()}
+      `;
+    }
+
+    function renderDeleteError(message) {
+      root.innerHTML = `
+        ${header()}
+        <div class="card">
+          <div class="error">${esc(message)}</div>
+          <button class="destructive" id="retry">Try again</button>
+          <button class="secondary" id="cancel">Cancel</button>
+        </div>
+        ${footer()}
+      `;
+      document.getElementById('retry').addEventListener('click', onConfirmDelete);
+      document.getElementById('cancel').addEventListener('click', onCancel);
+    }
+
+    // ── Handlers ──
+
+    async function onSubmitEmail(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const btn = document.getElementById('email-submit');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            shouldCreateUser: false,
+            emailRedirectTo: window.location.origin + '/delete-account.html',
+          },
+        });
+        if (error) {
+          const msg = (error.message || '').toLowerCase();
+          // Supabase returns "Signups not allowed for otp" when shouldCreateUser:false and the email doesn't exist.
+          const looksLikeNoUser = msg.includes('signups not allowed') || msg.includes('user not found');
+          renderInitial(looksLikeNoUser
+            ? 'No TrainLab account found for that email address.'
+            : `Couldn't send the verification email: ${error.message}`);
+          return;
+        }
+        renderEmailSent(email);
+      } catch (e) {
+        renderInitial(`Couldn't send the verification email: ${e?.message || e}`);
+      }
+    }
+
+    async function onConfirmDelete() {
+      renderDeleting();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          renderDeleteError('Your verification session expired. Please start over.');
+          return;
+        }
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ profileIds: [] }),
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || !result.success) {
+          const msg = result.error || result.failed || `HTTP ${res.status}`;
+          renderDeleteError(`Deletion failed: ${msg}. Please try again, or contact support if the problem persists.`);
+          return;
+        }
+        // Clear the now-invalid session token from localStorage.
+        await supabase.auth.signOut().catch(() => {});
+        renderDeleted();
+      } catch (e) {
+        renderDeleteError(`Deletion failed: ${e?.message || e}. Please try again or contact support.`);
+      }
+    }
+
+    async function onCancel() {
+      await supabase.auth.signOut().catch(() => {});
+      renderInitial(null);
+    }
+
+    // ── Boot: route based on auth state ──
+
+    async function boot() {
+      // detectSessionInUrl: true makes the SDK parse the magic-link redirect
+      // (#access_token=… hash in implicit flow) into a session automatically.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        renderConfirm(session.user.email || '(unknown)');
+        return;
+      }
+      // If the redirect is still being processed, listen briefly for the
+      // resulting SIGNED_IN / INITIAL_SESSION event.
+      let resolved = false;
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+        if (sess && !resolved) {
+          resolved = true;
+          sub.subscription.unsubscribe();
+          renderConfirm(sess.user.email || '(unknown)');
+        }
+      });
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          sub.subscription.unsubscribe();
+          renderInitial(null);
+        }
+      }, 1500);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
