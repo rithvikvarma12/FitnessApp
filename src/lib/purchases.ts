@@ -7,6 +7,7 @@ import { getDebugLog } from "./debugLog";
 export const ENTITLEMENT_ID = "Pro";
 export const OFFERING_ID = "trainlab_pro";
 const REVENUECAT_APPLE_KEY = "appl_XEYpcIKAbOASwyRQgYMRjnrRBwm";
+const REVENUECAT_GOOGLE_KEY = "goog_AIqyrcaQPAkuEbeQPwijfRBkuRF";
 
 const REVIEWER_EMAILS = [
   "appstoretest57@gmail.com",
@@ -23,7 +24,10 @@ export async function initPurchases(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
     await Purchases.setLogLevel({ level: LOG_LEVEL.ERROR });
-    await Purchases.configure({ apiKey: REVENUECAT_APPLE_KEY });
+    const apiKey = Capacitor.getPlatform() === 'android'
+      ? REVENUECAT_GOOGLE_KEY
+      : REVENUECAT_APPLE_KEY;
+    await Purchases.configure({ apiKey });
   } catch (e) {
     console.error("[RC] initPurchases failed:", e);
   } finally {
