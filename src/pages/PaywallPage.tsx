@@ -52,6 +52,10 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const billingDisclosure = Capacitor.getPlatform() === 'android'
+    ? "Payment will be charged to your Google account. Subscription renews automatically unless cancelled at least 24 hours before the end of the current period. You can manage or cancel subscriptions in Google Play Store settings."
+    : "Payment will be charged to your Apple ID. Subscription renews automatically unless cancelled at least 24 hours before the end of the current period. You can manage or cancel subscriptions in App Store settings.";
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
       setLoadingOffering(false);
@@ -314,13 +318,13 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
           </div>
         ) : (
           <div className="card" style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-            In-app purchases are available on iOS. Download the app to subscribe.
+            In-app purchases are available on iOS and Android. Download the app to subscribe.
           </div>
         )}
 
         {/* Legal */}
         <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6 }}>
-          Payment will be charged to your Apple ID. Subscription renews automatically unless cancelled at least 24 hours before the end of the current period. You can manage or cancel subscriptions in App Store settings.
+          {billingDisclosure}
         </div>
 
         {/* Policy links */}
@@ -334,8 +338,8 @@ export default function PaywallPage({ onClose }: PaywallPageProps) {
           </a>
           <span>·</span>
           <a
-            href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-            onClick={(e) => { e.preventDefault(); window.open("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/", "_system"); }}
+            href="https://fitness-app-jet-nine.vercel.app/terms-of-service.html"
+            onClick={(e) => { e.preventDefault(); window.open("https://fitness-app-jet-nine.vercel.app/terms-of-service.html", "_system"); }}
             style={{ color: "var(--text-muted)", textDecoration: "underline", cursor: "pointer" }}
           >
             Terms of Use
