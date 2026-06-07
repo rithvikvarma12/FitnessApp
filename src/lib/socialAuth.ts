@@ -7,9 +7,13 @@ export async function initSocialLogin() {
   if (!Capacitor.isNativePlatform()) return;
 
   await SocialLogin.initialize({
-    apple: {
-      clientId: 'com.trainlab.app',
-    },
+    // Apple Sign-In is only initialized on iOS. The Capgo plugin's Android
+    // Apple block requires `apple.android.redirectUrl` (an OAuth2 redirect
+    // proxy) — providing it without the proxy aborts the whole initialize()
+    // call and prevents Google from being registered.
+    ...(Capacitor.getPlatform() === 'ios'
+      ? { apple: { clientId: 'com.trainlab.app' } }
+      : {}),
     google: {
       webClientId: '829987695870-57jofk42cgaj01a093m4s9jq3essum22.apps.googleusercontent.com',
       iOSClientId: '829987695870-s976sqieq6mfe4n0pj2hfk9u2bpilukf.apps.googleusercontent.com',
@@ -64,9 +68,7 @@ export async function signInWithApple() {
 export async function signInWithGoogle() {
   const result = await SocialLogin.login({
     provider: 'google',
-    options: {
-      scopes: ['email', 'profile'],
-    },
+    options: {},
   });
 
   const token = (result as any)?.result?.idToken;

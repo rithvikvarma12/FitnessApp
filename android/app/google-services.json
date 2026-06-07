@@ -12,7 +12,28 @@
           "package_name": "com.trainlab.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "829987695870-60fsmdsjvh67u0n3m8f5e72si3160ain.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trainlab.app",
+            "certificate_hash": "fabfabdcae9f0ee1f8db5d5ca982f994d0651d7a"
+          }
+        },
+        {
+          "client_id": "829987695870-en6vecdpv7337h9vrrino5pa3nn6c2bd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trainlab.app",
+            "certificate_hash": "9f775f3a47bf3abaa3edbf647f6c28527faa2989"
+          }
+        },
+        {
+          "client_id": "829987695870-57jofk42cgaj01a093m4s9jq3essum22.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBH9dEU2urJ1WWRvDO0DDo-_qtq1wWmeV4"
@@ -20,7 +41,20 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "829987695870-57jofk42cgaj01a093m4s9jq3essum22.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "829987695870-s976sqieq6mfe4n0pj2hfk9u2bpilukf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.trainlab.app",
+                "app_store_id": "6760516596"
+              }
+            }
+          ]
         }
       }
     }

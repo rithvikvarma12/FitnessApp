@@ -9,7 +9,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { initSocialLogin } from './lib/socialAuth';
 
 SplashScreen.hide();
-void initSocialLogin();
+initSocialLogin().catch((e) => console.error('Social login init failed:', e));
 
 if (import.meta.env.PROD) { registerServiceWorker(); }
 void processQueue();
