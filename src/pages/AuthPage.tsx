@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { signIn, signUp } from "../lib/auth";
 import { signInWithApple, signInWithGoogle } from "../lib/socialAuth";
+import { requestPasswordReset } from "../lib/passwordReset";
 import { supabase } from "../lib/supabase";
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "reset";
 
 interface AuthPageProps {
   onAuth?: () => void;
@@ -29,6 +30,7 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -90,6 +92,30 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
     setMode((m) => (m === "signin" ? "signup" : "signin"));
     setErr(null);
     setInfo(null);
+  };
+
+  const goToMode = (m: Mode) => {
+    setMode(m);
+    setErr(null);
+    setInfo(null);
+    setResetSent(false);
+  };
+
+  const handleResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    setBusy(true);
+    try {
+      await requestPasswordReset(email);
+      // Non-revealing: we don't say whether the address has an account.
+      // resetSent also disables the button — rate-limit friendly.
+      setResetSent(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : null;
+      setErr(message ?? "Couldn't send the reset email. Please try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleApple = async () => {
@@ -163,11 +189,84 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
       </div>
 
       <div style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 32 }}>
-        {mode === "signin" ? "Welcome back" : "Create your account"}
+        {mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset your password"}
       </div>
 
       {/* Card */}
       <div className="card" style={{ width: "100%", maxWidth: 360, padding: "24px 20px" }}>
+        {mode === "reset" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {resetSent ? (
+              <div style={{
+                fontSize: 13, color: "#10b981", lineHeight: 1.55,
+                background: "rgba(16,185,129,0.08)",
+                border: "1px solid rgba(16,185,129,0.2)",
+                borderRadius: "var(--radius-md)",
+                padding: "12px 14px",
+              }}>
+                If an account exists for this address, a reset link is on its way. Open it in your
+                browser to choose a new password, then come back and sign in. Check your spam folder
+                if it doesn't arrive shortly.
+              </div>
+            ) : (
+              <form onSubmit={handleResetRequest} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                  Enter your account email and we'll send a link to reset your password.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                {err && (
+                  <div style={{
+                    fontSize: 12, color: "#ef4444",
+                    background: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.2)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "8px 12px",
+                  }}>
+                    {err}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={busy || !email}
+                  style={{
+                    width: "100%", padding: "13px", fontSize: 14, fontWeight: 700,
+                    background: "var(--accent-blue)", color: "#fff", border: "none",
+                    borderRadius: "var(--radius-md)", cursor: busy || !email ? "not-allowed" : "pointer",
+                    boxShadow: "0 0 20px rgba(59,130,246,0.3)",
+                    opacity: busy || !email ? 0.7 : 1,
+                  }}
+                >
+                  {busy ? "Sending…" : "Send reset link"}
+                </button>
+              </form>
+            )}
+            <button
+              type="button"
+              onClick={() => goToMode("signin")}
+              style={{
+                background: "none", border: "none", padding: 0,
+                color: "var(--accent-blue)", fontWeight: 700, fontSize: 12,
+                cursor: "pointer", textDecoration: "underline", alignSelf: "center",
+              }}
+            >
+              Back to sign in
+            </button>
+          </div>
+        ) : (
+        <>
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -253,6 +352,20 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
           >
             {busy ? (mode === "signin" ? "Signing in…" : "Creating account…") : (mode === "signin" ? "Sign In" : "Create Account")}
           </button>
+
+          {mode === "signin" && (
+            <button
+              type="button"
+              onClick={() => goToMode("reset")}
+              style={{
+                background: "none", border: "none", padding: 0, marginTop: -4,
+                color: "var(--text-muted)", fontWeight: 600, fontSize: 12,
+                cursor: "pointer", textDecoration: "underline", alignSelf: "center",
+              }}
+            >
+              Forgot password?
+            </button>
+          )}
         </form>
 
         {/* Social login */}
@@ -321,6 +434,8 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
             {mode === "signin" ? "Sign up" : "Sign in"}
           </button>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
